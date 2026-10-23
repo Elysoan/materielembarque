@@ -182,3 +182,7 @@
 .me-rapport summary, .me-pad summary { cursor: pointer; font-weight: 600; color: var(--marine); font-size: 13.5px; }
 .me-info a { color: var(--bleu); font-weight: 700; }
 .me-btn:disabled { background: #AAB4C3; border-color: #AAB4C3; color: #fff; cursor: not-allowed; }
+.me-guide { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 13.5px; }
+.me-guide li::marker { color: var(--marine); font-weight: 700; }
+.me-guide li b { color: var(--marine); }
+.me-guide .me-btn { margin-left: 8px; vertical-align: middle; }

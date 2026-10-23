@@ -65,10 +65,9 @@
     });
   }
 
+  // Format de référence Paprec : GH148HB (sans tiret ni espace)
   function immatNormalisee(s) {
-    let v = texte(s).toUpperCase().replace(/[\s_.]+/g, '-');
-    if (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(v)) v = v.slice(0, 2) + '-' + v.slice(2, 5) + '-' + v.slice(5);
-    return v;
+    return texte(s).toUpperCase().replace(/[\s_.\-]+/g, '');
   }
 
   function analyse(lignes, store) {
@@ -106,7 +105,7 @@
       if (vus.parc[cle(parc)]) { erreurs.push({ ligne: n, texte: 'N° de parc « ' + parc + ' » en double (déjà ligne ' + vus.parc[cle(parc)] + ').' }); continue; }
       if (vus.immat[cle(immat)]) { erreurs.push({ ligne: n, texte: 'Immatriculation « ' + immat + ' » en double (déjà ligne ' + vus.immat[cle(immat)] + ').' }); continue; }
       vus.parc[cle(parc)] = n; vus.immat[cle(immat)] = n;
-      if (!/^[A-Z]{2}-\d{3}-[A-Z]{2}$/.test(immat)) avertissements.push({ ligne: n, texte: 'Immatriculation « ' + immat + ' » hors format AA-123-AA (conservée telle quelle).' });
+      if (!/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(immat)) avertissements.push({ ligne: n, texte: 'Immatriculation « ' + immat + ' » hors format AA123AA (conservée telle quelle).' });
 
       // Identifiant stable : dérivé du n° de parc, pour que l'historique suive le véhicule d'un import à l'autre
       let id = 'p-' + cle(parc); while (vus.id[id]) id += 'x'; vus.id[id] = 1;

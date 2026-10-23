@@ -85,9 +85,10 @@
     /* ---------- Vues ---------- */
     function renderParc() {
       const agences = Array.from(new Set(store.vehicules.map(v => v.agence))).sort();
-      const q = state.q.toLowerCase();
+      const sans = x => String(x).toLowerCase().replace(/[\s\-]+/g, ''); // « GH-148 » trouve GH148HB
+      const q = sans(state.q);
       const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
-        (!state.solution || v.solution === state.solution) && (!q || (v.immat + ' ' + v.parc + ' ' + v.modele).toLowerCase().indexOf(q) >= 0));
+        (!state.solution || v.solution === state.solution) && (!q || sans(v.immat + ' ' + v.parc + ' ' + v.modele).indexOf(q) >= 0));
       if (!store.vehicule(state.vehicleId) && list.length) state.vehicleId = list[0].id;
       const v = store.vehicule(state.vehicleId);
       if (v && !store.lignes(v, state.vue).length) { // vue sans équipement pour cette solution : bascule sur une vue renseignée
@@ -116,7 +117,7 @@
       }
 
       view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2>' +
-        (store.parcInfo().demo ? '<p class="me-info">Parc de démonstration. <a href="#" data-action="goto-import">Importer votre parc</a></p>' : '') +
+        (store.parcInfo().demo ? '<p class="me-info">Parc de démonstration. <a href="#" data-action="modele">Télécharger le modèle</a> · <a href="#" data-action="goto-import">Importer votre parc</a></p>' : '') +
         '<div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
@@ -175,10 +176,12 @@
       return '<div class="me-pad" id="me-import"><h2 class="me-label">Parc de véhicules</h2>' +
         '<p class="me-sub">' + (info.demo ? 'Parc de démonstration (' + nb + ' véhicules) : importez le vôtre avec le modèle Excel.'
           : nb + ' véhicule' + (nb > 1 ? 's' : '') + (info.fichier ? ', importé' + (nb > 1 ? 's' : '') + ' depuis « ' + esc(info.fichier) + ' » le ' + fmt(info.importeLe) : '') + '. Un nouvel import remplace tout le parc ; l\'historique suit les véhicules par leur n° de parc.') + '</p>' +
+        '<ol class="me-guide"><li><b>Télécharger le modèle Excel</b> <button type="button" class="me-btn me-vert" data-action="modele">⬇ Modèle de parc (.xlsx)</button></li>' +
+        '<li><b>Le remplir</b> : une ligne par véhicule ; les équipements se remplissent selon la solution, mettre « Non » si absent.</li>' +
+        '<li><b>Le déposer ci-dessous</b>, vérifier le rapport, puis valider.</li></ol>' +
         '<div class="me-depot" tabindex="0" role="button" data-action="import-choisir"><strong>Glisser le fichier du parc ici</strong> ou cliquer pour le choisir<small>Modèle Excel (.xlsx) ou CSV</small></div>' +
         '<input type="file" accept=".xlsx,.xls,.csv" data-input="parc-in" hidden>' + rapport +
-        '<div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="modele">Télécharger le modèle vide</button>' +
-        '<button type="button" class="me-btn" data-action="parc-out">Exporter le parc actuel (CSV)</button></div></div>';
+        (store.parcInfo().demo ? '' : '<div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="parc-out">Exporter le parc actuel (CSV) pour le modifier</button></div>') + '</div>';
     }
 
     function importer(file) {
@@ -332,7 +335,7 @@
         // options.modele() -> Promise<Blob> : l'hôte peut fournir le modèle autrement qu'en fichier .xlsx servi
         const url = base + 'modele-parc-vehicules.xlsx', nom = 'modele-parc-vehicules.xlsx';
         (opts.modele ? opts.modele() : fetch(url).then(r => { if (!r.ok) throw 0; return r.blob(); }))
-          .then(b => save(nom, b, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+          .then(b => save(nom, b, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Modèle enregistré : remplissez-le puis déposez-le ici.'),
             () => { const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove(); });
       },
       'parc-out': () => save('parc-vehicules.csv', ME.parc.exporterCSV(store), 'text/csv;charset=utf-8', 'Parc exporté : modifiez-le puis réimportez-le.'),
