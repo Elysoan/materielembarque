@@ -20,20 +20,26 @@ Ouvrir `index.html` dans un navigateur (double-clic suffit).
 ```html
 <link rel="stylesheet" href="module/materiel-embarque.css">
 <script src="module/data.js"></script><script src="module/store.js"></script>
-<script src="module/mail.js"></script><script src="module/app.js"></script>
+<script src="module/mail.js"></script><script src="module/schemas.js"></script><script src="module/app.js"></script>
 <script>
   MaterielEmbarque.mount(document.getElementById('zone'), {
     vehicules: [...],        // optionnel : parc réel (même structure que module/data.js)
-    equipements: [...],      // optionnel : types d'équipements + position sur le schéma
+    types: [...],            // optionnel : types de véhicules (schéma + équipements + position des points)
     reglages: { destinataire: 'atelier@...' },
     storage: { load() {...}, save(obj) {...} }   // optionnel : remplace localStorage (API, SharePoint...)
   });
 </script>
 ```
-Données par défaut (équipements, gravités, parc de démo) : `module/data.js`.
+Données par défaut (types, équipements, gravités, parc de démo) : `module/data.js`.
+
+## Types de véhicules
+Bennette (3,5 t), BOM mono-compartiment, BOM bi-compartiment, BOM bras latéral, camion grue. Chaque type a son schéma
+(`module/schemas.js`) et sa liste d'équipements (ex. caméra de bras / joystick pour le BL, limiteur de charge / radiocommande /
+calage stabilisateurs pour la grue). Un véhicule référence son `type` ; `equipements: [...]` (optionnel) limite aux équipements
+réellement montés. Ajouter un type = un schéma dans `schemas.js` + une entrée dans `types` de `data.js`.
 
 ## Limites du MVP
 - Stockage local au navigateur par défaut (non partagé entre postes) → brancher `storage` pour un usage multi-utilisateurs.
-- Un seul schéma de véhicule (BOM). Autres types (ampliroll, laveuse...) = ajouter un schéma SVG.
+- Schémas simplifiés (pas à l'échelle) ; équipements et positions à valider avec vos réalités terrain.
 - Pas de pièce jointe/photo dans le mail (impossible via `mailto:`) ; possible dans le `.eml` en évolution.
 - L'application ne peut pas savoir si le mail a été réellement envoyé : l'historique indique « mail préparé ».

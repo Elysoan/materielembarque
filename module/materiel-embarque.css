@@ -77,3 +77,11 @@
 .me-dialog { width: min(680px, 94vw); max-height: 92vh; border: 1px solid var(--me-line); border-radius: 12px; padding: 20px; background: var(--me-bg); color: var(--me-fg); }
 .me-dialog::backdrop { background: rgba(10, 16, 24, .55); }
 .me-x { position: absolute; right: 10px; top: 8px; border: 0; background: none; font-size: 26px; line-height: 1; cursor: pointer; color: var(--me-mute); }
+
+/* Schémas supplémentaires */
+.t-arm { fill: #e0a526; stroke: #8a6a14; stroke-width: 2; }
+.t-craneline { fill: none; stroke: #e0a526; stroke-linecap: round; }
+.t-line { fill: #8d99a6; }
+.t-sep { stroke: #6b7a8b; stroke-width: 3; stroke-dasharray: 8 5; }
+.t-comp2 { fill: #c3d4c9; }
+@media (prefers-color-scheme: dark) { .t-comp2 { fill: #34493e; } }

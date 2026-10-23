@@ -7,7 +7,8 @@
 
   function build(store, inc) {
     const v = store.vehicule(inc.vehiculeId) || {};
-    const e = store.equipement(inc.equipId) || {};
+    const t = store.type(v.type) || {};
+    const e = store.equipement(v, inc.equipId) || {};
     const g = ME.defaults.gravites.find(x => x.niveau === inc.gravite) || {};
     const r = store.reglages();
     const urgent = inc.gravite >= 4 ? 'URGENT - ' : '';
@@ -24,7 +25,7 @@
       '- Immatriculation : ' + v.immat,
       '- N° de parc : ' + v.parc,
       '- Agence : ' + v.agence,
-      '- Modèle : ' + v.modele,
+      '- Type : ' + t.label + ' (' + v.modele + ')',
       '',
       'ÉQUIPEMENT EN DÉFAUT',
       '- Équipement : ' + e.label,

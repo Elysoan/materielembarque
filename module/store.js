@@ -25,7 +25,7 @@
       reglages: Object.assign({}, D.reglages, opts.reglages || {}, saved.reglages || {})
     };
     const vehicules = opts.vehicules || D.vehicules;
-    const equipements = opts.equipements || D.equipements;
+    const types = opts.types || D.types;
 
     const persist = () => storage.save(data);
     const now = () => new Date().toISOString();
@@ -40,9 +40,18 @@
     }
 
     const api = {
-      vehicules, equipements,
+      vehicules, types,
       vehicule: id => vehicules.find(v => v.id === id),
-      equipement: id => equipements.find(e => e.id === id),
+      type: id => types.find(t => t.id === id),
+      /** Équipements réellement montés sur un véhicule (sous-ensemble optionnel du type). */
+      equipsOf(v) {
+        const list = (api.type(v.type) || { equipements: [] }).equipements;
+        return v.equipements ? list.filter(e => v.equipements.indexOf(e.id) >= 0) : list;
+      },
+      equipement(v, equipId) {
+        const veh = typeof v === 'string' ? api.vehicule(v) : v;
+        return veh && ((api.type(veh.type) || { equipements: [] }).equipements.find(e => e.id === equipId));
+      },
       incidents: () => data.incidents.slice().sort((a, b) => b.creeLe.localeCompare(a.creeLe)),
       incident: id => data.incidents.find(i => i.id === id),
       isOpen: i => i.statut !== 'resolu',
@@ -95,7 +104,7 @@
         const cols = ['id', 'creeLe', 'immat', 'parc', 'equipement', 'gravite', 'statut', 'symptomes', 'declarant', 'resoluLe', 'mailLe'];
         const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
         const rows = api.incidents().map(i => {
-          const v = api.vehicule(i.vehiculeId) || {}, e = api.equipement(i.equipId) || {};
+          const v = api.vehicule(i.vehiculeId) || {}, e = api.equipement(v, i.equipId) || {};
           return [i.id, i.creeLe, v.immat, v.parc, e.label, i.gravite, i.statut, i.symptomes, i.declarant, i.resoluLe, i.mailLe]
             .map(q).join(';');
         });

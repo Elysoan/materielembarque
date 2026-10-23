@@ -1,21 +1,73 @@
-/* Configuration métier du module : types d'équipements, gravités, parc de démonstration.
+/* Configuration métier du module : types de véhicules, équipements, gravités, parc de démonstration.
    Tout ce qui est "donnée" est ici pour être remplacé facilement par l'outil global. */
 (function (root) {
   const ME = (root.MaterielEmbarque = root.MaterielEmbarque || {});
 
+  // Équipement : x/y = position du point cliquable dans le schéma SVG (viewBox 0 0 900 360).
+  const E = (id, label, code, x, y) => ({ id, label, code, x, y });
+
   ME.defaults = {
-    // Équipements d'une BOM (benne à ordures ménagères). x/y = position du point cliquable
-    // dans le schéma SVG (viewBox 0 0 900 360).
-    equipements: [
-      { id: 'cam_ar',   label: 'Caméra de recul',           code: 'CR', x: 55,  y: 140 },
-      { id: 'radar_ar', label: 'Radar / alarme de recul',   code: 'RA', x: 50,  y: 288 },
-      { id: 'rfid',     label: 'Lecteur RFID (levée)',      code: 'ID', x: 100, y: 200 },
-      { id: 'balance',  label: 'Pesée embarquée',           code: 'PE', x: 100, y: 246 },
-      { id: 'cam_lat',  label: 'Caméra latérale',           code: 'CL', x: 400, y: 112 },
-      { id: 'gyro',     label: 'Gyrophare',                 code: 'GY', x: 300, y: 72  },
-      { id: 'gps',      label: 'Balise GPS / télématique',  code: 'GP', x: 650, y: 96  },
-      { id: 'ecran',    label: 'Écran / tablette cabine',   code: 'EC', x: 742, y: 150 },
-      { id: 'dvr',      label: 'Enregistreur vidéo (DVR)',  code: 'DV', x: 660, y: 205 }
+    // Un type = un schéma (voir schemas.js) + sa liste d'équipements possibles.
+    types: [
+      { id: 'bennette', label: 'Bennette (3,5 t)', schema: 'bennette', equipements: [
+        E('cam_ar',   'Caméra de recul',          'CR', 60,  175),
+        E('radar_ar', 'Radar / alarme de recul',  'RA', 50,  288),
+        E('gyro',     'Gyrophare',                'GY', 260, 134),
+        E('gps',      'Balise GPS / télématique', 'GP', 520, 126),
+        E('ecran',    'Écran / tablette cabine',  'EC', 566, 186),
+        E('dvr',      'Enregistreur vidéo (DVR)', 'DV', 510, 225)
+      ] },
+      { id: 'bom_mono', label: 'BOM mono-compartiment', schema: 'bom_mono', equipements: [
+        E('cam_ar',   'Caméra de recul',          'CR', 55,  140),
+        E('radar_ar', 'Radar / alarme de recul',  'RA', 50,  288),
+        E('rfid',     'Lecteur RFID (levée)',     'ID', 100, 200),
+        E('balance',  'Pesée embarquée',          'PE', 100, 246),
+        E('cam_lat',  'Caméra latérale',          'CL', 400, 112),
+        E('gyro',     'Gyrophare',                'GY', 300, 72),
+        E('gps',      'Balise GPS / télématique', 'GP', 650, 96),
+        E('ecran',    'Écran / tablette cabine',  'EC', 742, 150),
+        E('dvr',      'Enregistreur vidéo (DVR)', 'DV', 660, 205)
+      ] },
+      { id: 'bom_bicomp', label: 'BOM bi-compartiment', schema: 'bom_bicomp', equipements: [
+        E('cam_ar',   'Caméra de recul',                   'CR', 55,  140),
+        E('radar_ar', 'Radar / alarme de recul',           'RA', 50,  288),
+        E('rfid',     'Lecteur RFID (levée)',              'ID', 100, 200),
+        E('balance',  'Pesée embarquée',                   'PE', 100, 246),
+        E('niv1',     'Détecteur de remplissage cpt 1',    'N1', 190, 120),
+        E('niv2',     'Détecteur de remplissage cpt 2',    'N2', 450, 120),
+        E('cloison',  'Commande de cloison / compartiment', 'CC', 315, 215),
+        E('cam_lat',  'Caméra latérale',                   'CL', 520, 190),
+        E('gyro',     'Gyrophare',                         'GY', 315, 72),
+        E('gps',      'Balise GPS / télématique',          'GP', 650, 96),
+        E('ecran',    'Écran / tablette cabine',           'EC', 742, 150),
+        E('dvr',      'Enregistreur vidéo (DVR)',          'DV', 660, 205)
+      ] },
+      { id: 'bom_bl', label: 'BOM bras latéral', schema: 'bom_bl', equipements: [
+        E('cam_ar',   'Caméra de recul',                    'CR', 55,  140),
+        E('radar_ar', 'Radar / alarme de recul',            'RA', 50,  288),
+        E('cam_bras', 'Caméra de bras',                     'CB', 499, 92),
+        E('capt_bras', 'Capteurs de position du bras',      'CP', 499, 175),
+        E('rfid',     'Lecteur RFID (préhenseur)',          'ID', 560, 205),
+        E('balance',  'Pesée embarquée (préhenseur)',       'PE', 556, 262),
+        E('joystick', 'Joystick de commande du bras',       'JS', 722, 218),
+        E('cam_lat',  'Caméra latérale',                    'CL', 300, 130),
+        E('gyro',     'Gyrophare',                          'GY', 250, 72),
+        E('gps',      'Balise GPS / télématique',           'GP', 650, 96),
+        E('ecran',    'Écran / tablette cabine',            'EC', 742, 150),
+        E('dvr',      'Enregistreur vidéo (DVR)',           'DV', 650, 222)
+      ] },
+      { id: 'camion_grue', label: 'Camion grue', schema: 'camion_grue', equipements: [
+        E('cam_ar',   'Caméra de recul',                       'CR', 55,  205),
+        E('radar_ar', 'Radar / alarme de recul',               'RA', 50,  288),
+        E('stab',     'Capteurs de calage des stabilisateurs', 'ST', 110, 272),
+        E('lmi',      'Limiteur de charge (LMI)',              'LC', 565, 195),
+        E('radio',    'Radiocommande de grue',                 'RC', 400, 212),
+        E('cam_grue', 'Caméra de flèche',                      'CF', 330, 46),
+        E('gyro',     'Gyrophare',                             'GY', 610, 76),
+        E('gps',      'Balise GPS / télématique',              'GP', 685, 84),
+        E('ecran',    'Écran / tablette cabine',               'EC', 742, 150),
+        E('dvr',      'Enregistreur vidéo (DVR)',              'DV', 660, 215)
+      ] }
     ],
 
     gravites: [
@@ -32,15 +84,17 @@
     ],
 
     // Parc de démonstration (remplaçable via mount(el, { vehicules: [...] })).
+    // `equipements` (optionnel) : sous-ensemble des équipements du type réellement montés sur ce véhicule.
     vehicules: [
-      { id: 'v1', immat: 'GH-214-AB', parc: 'BOM 214', agence: 'Lyon Est',   modele: 'Renault D Wide 26T',
-        equipements: ['cam_ar', 'radar_ar', 'rfid', 'balance', 'cam_lat', 'gyro', 'gps', 'ecran', 'dvr'] },
-      { id: 'v2', immat: 'GJ-587-KL', parc: 'BOM 587', agence: 'Lyon Est',   modele: 'Mercedes Econic 26T',
+      { id: 'v1', type: 'bom_mono',    immat: 'GH-214-AB', parc: 'BOM 214', agence: 'Lyon Est',     modele: 'Renault D Wide 26T' },
+      { id: 'v2', type: 'bom_mono',    immat: 'GJ-587-KL', parc: 'BOM 587', agence: 'Lyon Est',     modele: 'Mercedes Econic 26T',
         equipements: ['cam_ar', 'radar_ar', 'rfid', 'cam_lat', 'gyro', 'gps', 'ecran'] },
-      { id: 'v3', immat: 'FZ-032-RT', parc: 'BOM 032', agence: 'Villeurbanne', modele: 'Renault D Wide 19T',
-        equipements: ['cam_ar', 'radar_ar', 'gyro', 'gps', 'dvr'] },
-      { id: 'v4', immat: 'GK-901-MN', parc: 'BOM 901', agence: 'Villeurbanne', modele: 'Scania P280 26T',
-        equipements: ['cam_ar', 'radar_ar', 'rfid', 'balance', 'cam_lat', 'gyro', 'gps', 'ecran', 'dvr'] }
+      { id: 'v3', type: 'bom_bicomp',  immat: 'GM-120-CD', parc: 'BOM 120', agence: 'Lyon Est',     modele: 'Scania P280 26T bi-comp' },
+      { id: 'v4', type: 'bom_bl',      immat: 'GK-901-MN', parc: 'BL 901',  agence: 'Villeurbanne', modele: 'Renault D Wide 26T + bras' },
+      { id: 'v5', type: 'bom_bl',      immat: 'GP-310-EF', parc: 'BL 310',  agence: 'Villeurbanne', modele: 'Volvo FE 26T + bras',
+        equipements: ['cam_ar', 'radar_ar', 'cam_bras', 'capt_bras', 'joystick', 'gyro', 'gps', 'ecran'] },
+      { id: 'v6', type: 'bennette',    immat: 'FZ-032-RT', parc: 'BEN 032', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
+      { id: 'v7', type: 'camion_grue', immat: 'GN-455-ZX', parc: 'GRU 455', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue Hiab' }
     ],
 
     reglages: {

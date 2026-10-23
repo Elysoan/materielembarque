@@ -23,7 +23,7 @@
 
   /* ---------- Schéma SVG d'une BOM avec points cliquables ---------- */
   function truckSvg(store, v) {
-    const spots = v.equipements.map(id => store.equipement(id)).filter(Boolean).map(e => {
+    const spots = store.equipsOf(v).map(e => {
       const sev = store.graviteMax(v.id, e.id);
       const label = e.label + (sev ? ' - défaut gravité ' + sev : ' - RAS');
       return '<g class="me-spot me-s' + sev + '" tabindex="0" role="button" data-action="equip" data-id="' + e.id + '" aria-label="' + esc(label) + '">' +
@@ -35,21 +35,13 @@
         '</g>';
     }).join('');
     return '<svg class="me-truck" viewBox="0 0 900 360" role="group" aria-label="Schéma du véhicule ' + esc(v.immat) + '">' +
-      '<rect class="t-ground" x="0" y="338" width="900" height="3"/>' +
-      '<path class="t-body" d="M70 96 Q70 84 82 84 H548 Q560 84 560 96 V262 H70Z"/>' +
-      '<path class="t-body" d="M30 175 L130 150 V262 H30Z"/>' +
-      '<rect class="t-chassis" x="30" y="262" width="810" height="20" rx="4"/>' +
-      '<path class="t-cab" d="M585 262 V122 Q585 108 600 106 L700 98 Q716 97 726 108 L800 178 Q812 190 828 192 Q842 194 842 208 V262Z"/>' +
-      '<path class="t-glass" d="M706 120 L778 182 H706Z"/>' +
-      '<rect class="t-bumper" x="836" y="236" width="14" height="26" rx="4"/>' +
-      [[330, 305], [470, 305], [750, 305]].map(w => '<g class="t-wheel"><circle cx="' + w[0] + '" cy="' + w[1] + '" r="40"/><circle class="hub" cx="' + w[0] + '" cy="' + w[1] + '" r="16"/></g>').join('') +
-      spots + '</svg>';
+      ME.schemas[store.type(v.type).schema]() + spots + '</svg>';
   }
 
   function mount(el, opts) {
     opts = opts || {};
     const store = ME.createStore(opts);
-    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, q: '', agence: '', fStatut: 'ouvert', fSev: '', fQ: '' };
+    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, q: '', agence: '', type: '', fStatut: 'ouvert', fSev: '', fQ: '' };
 
     el.classList.add('me-root');
     el.innerHTML =
@@ -64,25 +56,25 @@
     function renderParc() {
       const agences = Array.from(new Set(store.vehicules.map(v => v.agence))).sort();
       const q = state.q.toLowerCase();
-      const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) &&
+      const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
         (!q || (v.immat + ' ' + v.parc + ' ' + v.modele).toLowerCase().indexOf(q) >= 0));
       const v = store.vehicule(state.vehicleId);
 
       const cards = list.map(x => {
         const n = store.ouverts(x.id).length, sev = store.graviteMax(x.id);
         return '<button class="me-card' + (x.id === state.vehicleId ? ' is-sel' : '') + '" data-action="vehicle" data-id="' + x.id + '">' +
-          '<strong>' + esc(x.parc) + '</strong><span>' + esc(x.immat) + ' · ' + esc(x.agence) + '</span>' +
+          '<strong>' + esc(x.parc) + '</strong><span>' + esc(x.immat) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.type(x.type) || {}).label) + '</span>' +
           (n ? '<span class="me-badge me-sev' + sev + '">' + n + ' défaut' + (n > 1 ? 's' : '') + ' · max ' + sev + '</span>' : '<span class="me-badge me-sev0">RAS</span>') + '</button>';
       }).join('') || '<p class="me-empty">Aucun véhicule.</p>';
 
       let detail = '<p class="me-empty">Sélectionnez un véhicule.</p>';
       if (v) {
-        const rows = v.equipements.map(id => store.equipement(id)).filter(Boolean).map(e => {
+        const rows = store.equipsOf(v).map(e => {
           const ops = store.ouverts(v.id, e.id);
           return '<tr><td>' + esc(e.label) + '</td><td>' + sevBadge(store.graviteMax(v.id, e.id)) + '</td>' +
             '<td><button class="me-btn" data-action="equip" data-id="' + e.id + '">' + (ops.length ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
         }).join('');
-        detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
+        detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(store.type(v.type).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
           '<p class="me-hint">Cliquez sur un équipement du schéma pour signaler un défaut.</p>' +
           truckSvg(store, v) +
           '<table class="me-table"><thead><tr><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -90,20 +82,21 @@
 
       view.innerHTML = '<div class="me-parc"><aside><div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
-        '<select data-input="agence"><option value="">Toutes agences</option>' + agences.map(a => '<option' + (a === state.agence ? ' selected' : '') + '>' + esc(a) + '</option>').join('') + '</select></div>' +
+        '<select data-input="agence"><option value="">Toutes agences</option>' + agences.map(a => '<option' + (a === state.agence ? ' selected' : '') + '>' + esc(a) + '</option>').join('') + '</select>' +
+        '<select data-input="type"><option value="">Tous types</option>' + store.types.map(t => '<option value="' + t.id + '"' + (t.id === state.type ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('') + '</select></div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
     }
 
     function renderHisto() {
       const q = state.fQ.toLowerCase();
       const list = store.incidents().filter(i => {
-        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(i.equipId) || {};
+        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
         return (state.fStatut === '' || (state.fStatut === 'ouvert' ? i.statut !== 'resolu' : i.statut === state.fStatut)) &&
           (!state.fSev || i.gravite === +state.fSev) &&
           (!q || (i.id + ' ' + v.immat + ' ' + v.parc + ' ' + e.label + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
       });
       const rows = list.map(i => {
-        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(i.equipId) || {};
+        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
         return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td>' + i.id + '</td><td>' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
           '<td>' + esc(e.label) + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
       }).join('');
@@ -139,7 +132,7 @@
     const closeBtn = '<button type="button" class="me-x" data-action="close" aria-label="Fermer">×</button>';
 
     function declareDialog(equipId) {
-      const v = store.vehicule(state.vehicleId), e = store.equipement(equipId);
+      const v = store.vehicule(state.vehicleId), e = store.equipement(v, equipId);
       const ops = store.ouverts(v.id, equipId);
       const existing = ops.length ? '<div class="me-warn"><strong>' + ops.length + ' défaut(s) déjà ouvert(s) sur cet équipement :</strong><ul>' +
         ops.map(i => '<li><a href="#" data-action="incident" data-id="' + i.id + '">' + i.id + '</a> · ' + sevBadge(i.gravite) + ' ' + esc(i.symptomes.slice(0, 80)) + '</li>').join('') + '</ul></div>' : '';
@@ -155,7 +148,7 @@
     }
 
     function incidentDialog(id) {
-      const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(i.equipId) || {};
+      const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
       openDlg(closeBtn + '<form class="me-form" data-form="update" data-id="' + id + '"><h3>' + id + ' <small>' + sevBadge(i.gravite) + '</small></h3>' +
         '<p class="me-sub">' + esc(e.label) + ' · ' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' +
         '<p class="me-pre">' + esc(i.symptomes) + '</p>' +
