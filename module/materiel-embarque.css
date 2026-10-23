@@ -207,3 +207,39 @@
 .me-tag { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--orange-texte); background: var(--orange-clair); border: 1px solid var(--orange-bord); border-radius: 99px; padding: 0 7px; vertical-align: 1px; }
 .me-panel .me-hint a { color: var(--bleu); font-weight: 700; }
 .me-table td.me-retard { color: var(--orange-texte); font-weight: 600; }
+.me-btn.me-danger { border-color: var(--rouge); color: var(--rouge); } .me-btn.me-danger:hover { background: #FBE3E3; }
+.me-btn.me-danger-plein { background: var(--rouge); border-color: var(--rouge); color: #fff; }
+
+/* Accompagnement : guide « Bien démarrer », visite guidée, mises en évidence */
+.me-visite { font: 600 13px var(--me-font); border: 1px solid rgba(255, 255, 255, .6); background: transparent; color: #fff; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.me-visite:hover { background: rgba(255, 255, 255, .1); }
+.me-lien { border: 0; background: none; padding: 0; color: var(--bleu); font: 600 12.5px var(--me-font); cursor: pointer; text-decoration: underline; }
+.me-guide-haut { margin-bottom: 16px; }
+.me-guide-carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 14px 18px; display: grid; gap: 10px; }
+.me-pad .me-guide-carte { border: 0; padding: 0; }
+.me-guide-carte .tete { display: flex; align-items: center; gap: 12px; }
+.me-guide-carte .tete b { color: var(--marine); font-size: 15px; }
+.me-guide-carte .prog { flex: 1; max-width: 220px; height: 8px; border-radius: 4px; background: var(--bord); overflow: hidden; }
+.me-guide-carte .prog i { display: block; height: 100%; background: var(--vert); border-radius: 0 4px 4px 0; transition: width .3s; }
+.me-guide-carte .cpt { font-size: 12.5px; color: var(--gris); font-weight: 600; font-variant-numeric: tabular-nums; }
+.me-guide-carte .me-lien { margin-left: auto; color: var(--gris); }
+.me-guide-etapes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.me-guide-etapes li { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: start; padding: 10px 12px; border-radius: 10px; background: var(--fond); border: 1px solid var(--bord); }
+.me-guide-etapes li .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--bord); color: var(--gris); }
+.me-guide-etapes li b { display: block; font-size: 13.5px; color: var(--encre); } .me-guide-etapes li small { display: block; font-size: 12px; }
+.me-guide-etapes li .me-btn { grid-column: 1 / -1; justify-self: start; padding: 6px 12px; font-size: 13px; }
+.me-guide-etapes li.fait { background: var(--vert-clair); border-color: transparent; } .me-guide-etapes li.fait .n { background: var(--vert); color: #fff; } .me-guide-etapes li.fait b { color: var(--vert-texte); }
+.me-guide-etapes li.cours { background: #fff; border-color: var(--marine); box-shadow: inset 4px 0 0 var(--marine); } .me-guide-etapes li.cours .n { background: var(--marine); color: #fff; }
+.me-bandeau-visite { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.me-stack > .me-bandeau-visite { margin-bottom: 0; }
+.me-bandeau-visite .me-actions { margin: 0; }
+.me-flash { animation: me-flash 1.1s ease-in-out 4; }
+@keyframes me-flash { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--vert) 55%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .me-flash { animation: none; box-shadow: 0 0 0 4px var(--vert); } }
+.me-tour { position: fixed; inset: 0; z-index: 40; }
+.me-tour-halo { position: fixed; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(28, 52, 101, .55); outline: 3px solid #fff; pointer-events: none; transition: all .2s; }
+.me-tour-bulle { position: fixed; background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 12px 36px rgba(28, 52, 101, .35); display: grid; gap: 6px; }
+.me-tour-bulle .tete { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--gris); font-weight: 600; }
+.me-tour-bulle h3 { margin: 0; font-size: 16px; color: var(--marine); } .me-tour-bulle p { margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; }
+.me-tour-bulle .me-btn:disabled { opacity: .45; cursor: default; background: #fff; color: var(--marine); border-color: var(--marine); }
+@media (prefers-reduced-motion: reduce) { .me-tour-halo { transition: none; } }

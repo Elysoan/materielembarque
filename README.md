@@ -10,6 +10,9 @@ niveau de gravité, historique, préparation du mail pour Outlook. Sans dépenda
 - **Version développement** : ouvrir `index.html` (charge les fichiers de `module/`).
 
 ## Fonctionnement
+0. **Accompagnement** : au premier lancement, l'outil propose une **visite guidée** (bouton « ❓ Visite guidée » dans le bandeau) et affiche
+   le guide **« Bien démarrer »** : importer le parc → indiquer son nom → signaler un premier défaut → suivre la résolution.
+   Les étapes se cochent seules ; le bouton vert mène à la prochaine action. L'outil réel démarre **vide** (aucun véhicule fictif).
 1. **Parc** : choisir un véhicule (filtres agence / solution / type). Son **picto** s'affiche en grand avec deux zones cliquables
    (**Cabine** / **Arrière**) ; chaque vue montre l'équipement sur une image avec des points cliquables
    (vert = RAS, jaune à rouge foncé = défaut ouvert, numéro = gravité).

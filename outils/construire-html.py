@@ -25,7 +25,7 @@ DEMO = r"""
 (function () {
   const ME = window.MaterielEmbarque, CLE = 'materielembarque.demo';
   document.getElementById('demo-reset').onclick = function () { try { localStorage.removeItem(CLE); } catch (e) {} location.reload(); };
-  const app = ME.mount(document.getElementById('app'), { version: 'v0.4 · démo', cleStockage: CLE });
+  const app = ME.mount(document.getElementById('app'), { version: 'v0.4 · démo', cleStockage: CLE, guide: false });
   const st = app.store;
   if (st.incidents().length) return;
   st.setReglages({ declarant: 'Démo' });
@@ -107,7 +107,7 @@ body {{ margin: 0; background: #F5F7FA; }}
 {js(assets)}
 </script>
 """ + ''.join('<script>\n' + js((M / s).read_text(encoding='utf-8')) + '\n</script>\n' for s in SCRIPTS) + \
-    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.4' });</script>\n") + """</body>
+    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.4', vehicules: [] });</script>\n") + """</body>
 </html>
 """
     sortie = RACINE / 'dist' / ('materiel-embarque-demo.html' if demo else 'materiel-embarque.html')

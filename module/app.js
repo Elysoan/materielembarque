@@ -47,6 +47,7 @@
     el.classList.add('me-root');
     el.innerHTML =
       '<header class="me-head"><img class="me-logo" src="' + asset('img/logo-paprec.svg') + '" alt="Paprec"><h1 class="me-titre">Matériel embarqué</h1><span class="me-spacer"></span>' +
+      (opts.tour === false ? '' : '<button type="button" class="me-visite" data-action="tour-go" title="Visite guidée de l\'écran (1 minute)">❓ Visite guidée</button>') +
       '<nav class="me-tabs" role="tablist">' +
       ['parc:Parc', 'histo:Historique', 'regl:Réglages'].map(t => { const p = t.split(':'); return '<button role="tab" data-action="tab" data-id="' + p[0] + '">' + p[1] + '</button>'; }).join('') +
       '</nav>' + (opts.version ? '<span class="me-pill">' + esc(opts.version) + '</span>' : '') + '</header><main class="me-view"></main><dialog class="me-dialog"></dialog>';
@@ -84,8 +85,96 @@
         '<div class="me-scroll"><table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
+    /* ---------- Accompagnement : guide « Bien démarrer » et visite guidée ---------- */
+    function guideEtapes() {
+      const info = store.parcInfo(), inc = store.incidents();
+      return [
+        { ok: store.vehicules.length > 0 && !info.demo, titre: 'Importer votre parc', aide: 'Téléchargez le modèle Excel, remplissez-le, déposez-le.', action: 'goto-import', bouton: 'Importer le parc' },
+        { ok: !!store.reglages().declarant, titre: 'Indiquer votre nom', aide: 'Il signe les mails envoyés à Simpliciti.', action: 'goto-nom', bouton: 'Renseigner' },
+        { ok: inc.length > 0, titre: 'Signaler un premier défaut', aide: 'Choisissez un véhicule et cliquez sur l\'équipement en défaut.', action: 'guide-signaler', bouton: 'Me montrer' },
+        { ok: inc.some(i => i.statut !== 'ouvert'), titre: 'Suivre la résolution', aide: 'Dans l\'Historique, passez le signalement « En cours » puis « Résolu ».', action: 'guide-suivi', bouton: 'Ouvrir l\'historique' }
+      ];
+    }
+    function guideHtml() {
+      if (opts.guide === false || store.reglages().guideMasque) return '';
+      const e = guideEtapes(), faits = e.filter(x => x.ok).length, cours = e.find(x => !x.ok);
+      if (!cours) return '';
+      return '<div class="me-guide-carte"><div class="tete"><b>Bien démarrer</b><span class="prog" aria-hidden="true"><i style="width:' + (faits / e.length * 100) + '%"></i></span>' +
+        '<span class="cpt">' + faits + ' / ' + e.length + '</span><button type="button" class="me-lien" data-action="guide-masquer">Masquer</button></div>' +
+        '<ol class="me-guide-etapes">' + e.map((x, i) => '<li class="' + (x.ok ? 'fait' : x === cours ? 'cours' : '') + '"><span class="n">' + (x.ok ? '✓' : i + 1) + '</span>' +
+          '<div><b>' + x.titre + '</b><small>' + x.aide + '</small></div>' + (x === cours ? '<button type="button" class="me-btn me-vert" data-action="' + x.action + '">' + x.bouton + '</button>' : '') + '</li>').join('') + '</ol></div>';
+    }
+    function propositionVisite() {
+      if (opts.tour === false || store.reglages().tourVu) return '';
+      return '<div class="me-info me-bandeau-visite"><span><b>Première visite ?</b> Une visite guidée d\'une minute présente l\'écran.</span>' +
+        '<span class="me-actions"><button type="button" class="me-btn me-primary" data-action="tour-go">Lancer la visite</button><button type="button" class="me-btn" data-action="tour-plus-tard">Plus tard</button></span></div>';
+    }
+    // Met un élément en évidence quelques secondes (points d'équipement, ligne de tableau…)
+    function souligner(sel) {
+      const n = el.querySelectorAll(sel);
+      n.forEach(x => x.classList.add('me-flash'));
+      if (n[0]) n[0].scrollIntoView({ block: 'center' });
+      setTimeout(() => n.forEach(x => x.classList.remove('me-flash')), 4500);
+      return n.length;
+    }
+
+    let tour = null; // { etapes, i }
+    function etapesVisite() {
+      if (!store.vehicules.length) return [
+        { sel: '.me-guide-carte', t: 'Bien démarrer', x: 'Ces étapes se cochent toutes seules au fur et à mesure. Le bouton vert mène toujours à la prochaine action.' },
+        { sel: '.me-guide [data-action=modele]', t: 'Le modèle de parc', x: 'Téléchargez le modèle Excel : une ligne par véhicule, les équipements se remplissent selon la solution.' },
+        { sel: '.me-depot', t: 'Déposer le fichier', x: 'Glissez le fichier rempli ici. Un rapport signale les erreurs ligne par ligne avant de valider.' },
+        { sel: '.me-tabs [data-id=regl]', t: 'Les réglages', x: 'Vous y retrouverez l\'import du parc, la copie des mails et la sauvegarde des données.' }
+      ];
+      return [
+        { sel: '.me-parc > aside', t: 'Votre parc', x: 'Recherchez un véhicule par immatriculation, filtrez par agence, solution ou type. La pastille donne son état : RAS ou la gravité la plus haute.' },
+        { sel: '.me-picto', t: 'Le véhicule', x: 'Les zones Cabine et Arrière se colorent dès qu\'un équipement est en défaut. Cliquez sur une zone pour l\'afficher.' },
+        { sel: '.me-vue', t: 'Les équipements', x: 'Chaque point est un équipement (G / D : chaise gauche / droite). Cliquez dessus : diagnostic guidé, gravité, puis mail prêt pour Simpliciti.' },
+        { sel: '.me-tabs [data-id=histo]', t: 'L\'historique', x: 'Suivez les statuts et les délais de résolution, et repérez les équipements et véhicules les plus touchés.' },
+        { sel: '.me-tabs [data-id=regl]', t: 'Les réglages', x: 'Importez ou mettez à jour le parc, ajoutez une copie aux mails, sauvegardez vos données.' }
+      ];
+    }
+    function afficherVisite() {
+      let box = el.querySelector('.me-tour');
+      if (!tour) { if (box) box.remove(); return; }
+      const etapes = tour.etapes.filter(e => el.querySelector(e.sel));
+      if (tour.i >= etapes.length) { tour = null; afficherVisite(); return; }
+      const e = etapes[tour.i], cible = el.querySelector(e.sel);
+      if (!box) {
+        box = document.createElement('div'); box.className = 'me-tour';
+        box.innerHTML = '<div class="me-tour-halo"></div><div class="me-tour-bulle" role="dialog" aria-modal="true" aria-labelledby="me-tour-t"><div class="tete"><span data-cpt></span>' +
+          '<button type="button" class="me-lien" data-action="tour-fin">Passer la visite</button></div><h3 id="me-tour-t"></h3><p></p>' +
+          '<div class="me-actions"><button type="button" class="me-btn" data-action="tour-prec">← Précédent</button><button type="button" class="me-btn me-primary" data-action="tour-suiv"></button></div></div>';
+        el.appendChild(box);
+      }
+      box.querySelector('[data-cpt]').textContent = (tour.i + 1) + ' / ' + etapes.length;
+      box.querySelector('h3').textContent = e.t; box.querySelector('p').textContent = e.x;
+      box.querySelector('[data-action=tour-prec]').disabled = tour.i === 0;
+      box.querySelector('[data-action=tour-suiv]').textContent = tour.i === etapes.length - 1 ? 'Terminer' : 'Suivant →';
+      cible.scrollIntoView({ block: 'center' });
+      const r = cible.getBoundingClientRect(), halo = box.querySelector('.me-tour-halo'), bulle = box.querySelector('.me-tour-bulle'), m = 6;
+      Object.assign(halo.style, { left: (r.left - m) + 'px', top: (r.top - m) + 'px', width: (r.width + 2 * m) + 'px', height: (r.height + 2 * m) + 'px' });
+      const bw = Math.min(360, innerWidth - 32), bh = bulle.offsetHeight || 180;
+      const enBas = r.bottom + m + 12 + bh < innerHeight || r.top < bh + 24;
+      Object.assign(bulle.style, { width: bw + 'px', left: Math.max(16, Math.min(r.left, innerWidth - bw - 16)) + 'px',
+        top: Math.max(16, Math.min(enBas ? r.bottom + m + 12 : r.top - m - 12 - bh, innerHeight - bh - 16)) + 'px' });
+      bulle.querySelector('[data-action=tour-suiv]').focus();
+    }
+    function lancerVisite() {
+      store.setReglages({ tourVu: true });
+      state.tab = 'parc'; render();
+      tour = { etapes: etapesVisite(), i: 0 }; afficherVisite();
+    }
+    root.addEventListener('resize', () => tour && afficherVisite());
+
     /* ---------- Vues ---------- */
     function renderParc() {
+      if (!store.vehicules.length) { // premier lancement : pas encore de parc, on guide vers l'import
+        view.innerHTML = '<div class="me-stack">' + propositionVisite() + '<div class="me-pad"><h2 class="me-label">Bienvenue dans le suivi du matériel embarqué</h2>' +
+          '<p class="me-sub">Aucun véhicule pour l\'instant. Importez votre parc pour afficher les véhicules et leurs équipements, puis signaler les défauts.</p>' + guideHtml() + '</div>' +
+          importHtml() + '</div>';
+        return;
+      }
       const agences = Array.from(new Set(store.vehicules.map(v => v.agence))).sort();
       const sans = x => String(x).toLowerCase().replace(/[\s\-]+/g, ''); // « GH-148 » trouve GH148HB
       const q = sans(state.q);
@@ -118,7 +207,7 @@
           '<p class="me-hint">Cliquez sur un équipement : diagnostic guidé, niveau de gravité, puis mail prêt pour Outlook.</p>' + vueHtml(v, state.vue);
       }
 
-      view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2>' +
+      view.innerHTML = propositionVisite() + (guideHtml() ? '<div class="me-guide-haut">' + guideHtml() + '</div>' : '') + '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2>' +
         (store.parcInfo().demo ? '<p class="me-info">Parc de démonstration. <a href="#" data-action="modele">Télécharger le modèle</a> · <a href="#" data-action="goto-import">Importer votre parc</a></p>' : '') +
         '<div class="me-filters">' +
         '<input type="search" placeholder="Immatriculation, modèle…" value="' + esc(state.q) + '" data-input="q">' +
@@ -240,7 +329,7 @@
           '<button type="button" class="me-btn me-vert" data-action="import-appliquer"' + (res.vehicules.length ? '' : ' disabled') + '>Remplacer le parc par ces ' + res.vehicules.length + ' véhicules</button></div></div>';
       }
       return '<div class="me-pad" id="me-import"><h2 class="me-label">Parc de véhicules</h2>' +
-        '<p class="me-sub">' + (info.demo ? 'Parc de démonstration (' + nb + ' véhicules) : importez le vôtre avec le modèle Excel.'
+        '<p class="me-sub">' + (!nb ? 'Aucun véhicule importé.' : info.demo ? 'Parc de démonstration (' + nb + ' véhicules) : importez le vôtre avec le modèle Excel.'
           : nb + ' véhicule' + (nb > 1 ? 's' : '') + (info.fichier ? ', importé' + (nb > 1 ? 's' : '') + ' depuis « ' + esc(info.fichier) + ' » le ' + fmt(info.importeLe) : '') + '. Un nouvel import remplace tout le parc ; l\'historique suit les véhicules par leur immatriculation.') + '</p>' +
         '<ol class="me-guide"><li><b>Télécharger le modèle Excel</b> <button type="button" class="me-btn me-vert" data-action="modele">⬇ Modèle de parc (.xlsx)</button></li>' +
         '<li><b>Le remplir</b> : une ligne par véhicule ; les équipements se remplissent selon la solution, mettre « Non » si absent.</li>' +
@@ -255,7 +344,7 @@
       state.importRes = { chargement: true, fichier: file.name }; render();
       ME.parc.lireFichier(file).then(lignes => { state.importRes = Object.assign(ME.parc.analyse(lignes, store), { fichier: file.name }); },
         e => { state.importRes = { fichier: file.name, echec: (e && e.message) || 'Fichier illisible : utilisez le modèle Excel ou un CSV.' }; })
-        .then(() => { if (state.tab === 'regl') render(); });
+        .then(() => { if (state.tab === 'regl' || state.tab === 'parc') render(); });
     }
 
     function renderRegl() {
@@ -266,7 +355,11 @@
         f('copie', 'Copie supplémentaire (facultatif)', 'atelier@… ; responsable@…') + f('declarant', 'Votre nom (signature)') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
         '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
-        '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
+        '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label>' +
+        '<button type="button" class="me-btn me-danger" data-action="reset-ask">Tout effacer</button></div>' +
+        (state.resetAsk ? '<div class="me-warn">Effacer définitivement les ' + store.incidents().length + ' signalement(s) et le parc importé de ce navigateur ? Les réglages sont conservés. ' +
+          'Pensez à « Sauvegarder (JSON) » avant si besoin.<div class="me-actions"><button type="button" class="me-btn" data-action="reset-non">Annuler</button>' +
+          '<button type="button" class="me-btn me-danger-plein" data-action="reset-ok">Oui, tout effacer</button></div></div>' : '') +
         '<p class="me-info">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div></div>';
     }
 
@@ -360,7 +453,7 @@
       currentMail = { id, m: ME.mail.build(store, i) };
       const m = currentMail.m;
       openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>Mail prêt à envoyer</h3>' + (fresh ? etapes(3) : '') +
-        (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique.</p>' : '') +
+        (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique. <b>Étape suivante :</b> envoyez le mail, puis suivez le signalement dans l\'Historique (« En cours », puis « Résolu »).</p>' : '') +
         '<label>À<input name="to" value="' + esc(m.to) + '" readonly></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
         '<label>Objet<input name="subject" value="' + esc(m.subject) + '"></label>' +
         '<label>Message<textarea name="body" rows="14">' + esc(m.body) + '</textarea></label>' +
@@ -378,6 +471,19 @@
     /* ---------- Événements ---------- */
     const actions = {
       tab: t => { state.tab = t.dataset.id; render(); },
+      'tour-go': () => { store.setReglages({ guideMasque: false }); lancerVisite(); },
+      'tour-plus-tard': () => { store.setReglages({ tourVu: true }); render(); toast('Visite disponible à tout moment : bouton « Visite guidée » en haut.'); },
+      'tour-suiv': () => { tour.i++; afficherVisite(); if (!tour) toast('Visite terminée. Le guide « Bien démarrer » vous indique la prochaine étape.'); },
+      'tour-prec': () => { tour.i = Math.max(0, tour.i - 1); afficherVisite(); },
+      'tour-fin': () => { tour = null; afficherVisite(); },
+      'guide-masquer': () => { store.setReglages({ guideMasque: true }); render(); toast('Guide masqué : « Visite guidée » le réaffiche.'); },
+      'goto-nom': () => { state.tab = 'regl'; render(); const i = el.querySelector('[name=declarant]'); if (i) { i.scrollIntoView({ block: 'center' }); i.focus(); i.classList.add('me-flash'); setTimeout(() => i.classList.remove('me-flash'), 4500); } },
+      'guide-signaler': () => {
+        state.tab = 'parc'; render();
+        if (souligner('.me-hot, .me-chip')) toast('Cliquez sur un point : il ouvre le signalement avec le diagnostic guidé.');
+        else toast('Choisissez d\'abord un véhicule dans la liste de gauche.');
+      },
+      'guide-suivi': () => { state.tab = 'histo'; state.fStatut = ''; render(); souligner('tr.me-click'); toast('Ouvrez un signalement pour changer son statut.'); },
       vehicle: t => { state.vehicleId = t.dataset.id; render(); },
       vue: t => { state.vue = t.dataset.id; render(); },
       equip: t => declareDialog(t.dataset.id, t.dataset.cote),
@@ -387,6 +493,9 @@
       'diag-answer': t => { ME.diag.answer(diag.st, +t.dataset.i); refreshDiag(); },
       'diag-back': () => { ME.diag.back(diag.st); refreshDiag(); },
       'diag-reset': () => { diag.st = null; refreshDiag(); },
+      'reset-ask': () => { state.resetAsk = true; render(); },
+      'reset-non': () => { state.resetAsk = false; render(); },
+      'reset-ok': () => { store.reset(); state.resetAsk = false; state.importRes = null; render(); toast('Données effacées : l\'outil repart de zéro.'); },
       'goto-import': () => { state.tab = 'regl'; render(); const s = el.querySelector('#me-import'); if (s) s.scrollIntoView({ block: 'start' }); },
       'import-choisir': () => el.querySelector('[data-input="parc-in"]').click(),
       'import-annuler': () => { state.importRes = null; render(); },
@@ -440,6 +549,7 @@
       if (actions[t.dataset.action]) actions[t.dataset.action](t);
     });
     el.addEventListener('keydown', ev => {
+      if (tour && ev.key === 'Escape') { tour = null; afficherVisite(); return; }
       const t = ev.target.closest && ev.target.closest('.me-click, .me-depot');
       if (t && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); actions[t.dataset.action](t); }
     });

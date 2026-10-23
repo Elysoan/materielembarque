@@ -107,6 +107,8 @@
         persist();
         return inc;
       },
+      /** Repart de zéro : signalements et parc importé effacés (les réglages sont conservés). */
+      reset() { data.incidents = []; data.parc = null; persist(); },
       markMail(id, mode) { api.update(id, { mailLe: now() }, 'Mail préparé (' + mode + ')'); },
 
       reglages: () => data.reglages,
