@@ -44,6 +44,7 @@
 
     const api = {
       types, solutions, vues, equipements,
+      destinataire: opts.destinataire || D.mail.destinataire,
       /** Parc courant : le parc importé s'il existe, sinon celui fourni à mount() (ou la démonstration). */
       get vehicules() { return data.parc ? data.parc.vehicules : vehiculesDefaut; },
       parcInfo: () => data.parc ? { fichier: data.parc.fichier, importeLe: data.parc.importeLe, demo: false } : { demo: !opts.vehicules },

@@ -86,11 +86,12 @@
       { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', parc: 'GRU 455', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
     ],
 
+    // Mail de signalement : toujours adressé au service clients Simpliciti (ouverture de ticket).
+    mail: { destinataire: 'service.clients@simpliciti.fr' },
+
     reglages: {
-      destinataire: '',
       copie: '',
-      declarant: '',
-      prefixeObjet: '[Matériel embarqué]'
+      declarant: ''
     }
   };
 })(window);

@@ -186,3 +186,4 @@
 .me-guide li::marker { color: var(--marine); font-weight: 700; }
 .me-guide li b { color: var(--marine); }
 .me-guide .me-btn { margin-left: 8px; vertical-align: middle; }
+.me-root input[readonly] { background: var(--fond); color: var(--gris); }

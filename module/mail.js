@@ -25,7 +25,8 @@
     const r = store.reglages();
     const urgent = inc.gravite >= 4 ? 'URGENT - ' : '';
 
-    const subject = [r.prefixeObjet, '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + equipLabel, '-', v.immat, '(' + v.parc + ')']
+    // Objet préfixé par la solution du véhicule : Simpliciti oriente le ticket dès sa réception
+    const subject = ['[' + (sol.label || 'Matériel embarqué') + ']', '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + equipLabel, '-', v.immat, '(' + v.parc + ')']
       .filter(Boolean).join(' ');
 
     const body = [
@@ -59,7 +60,7 @@
       inc.declarant || ''
     ]).join('\n');
 
-    return { to: r.destinataire || '', cc: r.copie || '', subject, body };
+    return { to: store.destinataire, cc: r.copie || '', subject, body };
   }
 
   /** Lien mailto: ; renvoie aussi `truncated` si le corps a dû être raccourci. */

@@ -17,7 +17,7 @@ Ouvrir `index.html` dans un navigateur (double-clic suffit).
    - *Ouvrir dans Outlook* : lien `mailto:` (texte tronqué si trop long, limite des liens Outlook) ;
    - *Télécharger le brouillon (.eml)* : s'ouvre dans Outlook en brouillon (`X-Unsent: 1`), texte complet (recommandé) ;
    - *Copier*.
-5. **Historique** : indicateurs, filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : destinataire par défaut, signature, sauvegarde JSON.
+5. **Historique** : indicateurs, filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : copie (Cc), signature, sauvegarde JSON. Destinataire fixe : service.clients@simpliciti.fr ; objet préfixé par la solution ([CITI'ID], [CITIPAP]…).
 
 ## Import du parc de véhicules
 1. Réglages › Parc de véhicules › **Télécharger le modèle vide** (`module/modele-parc-vehicules.xlsx`).
@@ -47,7 +47,7 @@ Un arbre = des nœuds (question + options) ; une option mène à un autre nœud,
 <script>
   MaterielEmbarque.mount(document.getElementById('zone'), {
     vehicules: [...],        // optionnel : parc réel (même structure que module/data.js)
-    reglages: { destinataire: 'atelier@...' },
+    destinataire: 'service.clients@simpliciti.fr', // optionnel : valeur par défaut (module/data.js)
     storage: { load() {...}, save(obj) {...} }   // optionnel : remplace localStorage (API, SharePoint...)
   });
 </script>

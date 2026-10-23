@@ -196,8 +196,8 @@
       const r = store.reglages();
       const f = (k, label, ph) => '<label>' + label + '<input name="' + k + '" value="' + esc(r[k]) + '" placeholder="' + esc(ph || '') + '"></label>';
       view.innerHTML = '<div class="me-stack">' + importHtml() + '<div class="me-pad"><form class="me-form" data-form="regl"><h2 class="me-label">Réglages du mail</h2>' +
-        f('destinataire', 'Destinataire(s) par défaut', 'atelier@exemple.fr ; maintenance@exemple.fr') + f('copie', 'Copie (Cc)') +
-        f('declarant', 'Votre nom (signature)') + f('prefixeObjet', 'Préfixe de l\'objet') +
+        '<p class="me-info">Les signalements sont adressés à <b>' + esc(store.destinataire) + '</b> ; l\'objet commence par la solution du véhicule (ex. [CITI\'ID]).</p>' +
+        f('copie', 'Copie (Cc)', 'atelier@… ; responsable@…') + f('declarant', 'Votre nom (signature)') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
         '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
@@ -295,8 +295,7 @@
       const m = currentMail.m;
       openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>Mail prêt à envoyer</h3>' + (fresh ? etapes(3) : '') +
         (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique.</p>' : '') +
-        (m.to ? '' : '<p class="me-warn">Aucun destinataire par défaut : renseignez-le ici ou dans Réglages.</p>') +
-        '<label>À<input name="to" value="' + esc(m.to) + '"></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
+        '<label>À<input name="to" value="' + esc(m.to) + '" readonly></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
         '<label>Objet<input name="subject" value="' + esc(m.subject) + '"></label>' +
         '<label>Message<textarea name="body" rows="14">' + esc(m.body) + '</textarea></label>' +
         '<p class="me-hint" data-note>' + (emlOk ? '' : 'Si Outlook ne s\'ouvre pas, copiez le message et collez-le dans un nouveau mail.') + '</p>' +
@@ -401,7 +400,7 @@
       const f = ev.target, kind = f.dataset.form;
       ev.preventDefault();
       if (kind === 'regl') {
-        store.setReglages({ destinataire: f.destinataire.value.trim(), copie: f.copie.value.trim(), declarant: f.declarant.value.trim(), prefixeObjet: f.prefixeObjet.value.trim() });
+        store.setReglages({ copie: f.copie.value.trim(), declarant: f.declarant.value.trim() });
         render(); toast('Réglages enregistrés.');
       } else if (kind === 'declare') {
         store.setReglages({ declarant: f.declarant.value.trim() });
