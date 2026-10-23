@@ -22,9 +22,10 @@
     const saved = storage.load() || {};
     const data = {
       incidents: saved.incidents || [],
+      parc: saved.parc || null, // { vehicules, fichier, importeLe } une fois un parc importé
       reglages: Object.assign({}, D.reglages, opts.reglages || {}, saved.reglages || {})
     };
-    const vehicules = opts.vehicules || D.vehicules;
+    const vehiculesDefaut = opts.vehicules || D.vehicules;
     const types = opts.types || D.types;
     const solutions = opts.solutions || D.solutions;
     const equipements = opts.equipements || D.equipements;
@@ -42,8 +43,12 @@
     }
 
     const api = {
-      vehicules, types, solutions, vues, equipements,
-      vehicule: id => vehicules.find(v => v.id === id),
+      types, solutions, vues, equipements,
+      /** Parc courant : le parc importé s'il existe, sinon celui fourni à mount() (ou la démonstration). */
+      get vehicules() { return data.parc ? data.parc.vehicules : vehiculesDefaut; },
+      parcInfo: () => data.parc ? { fichier: data.parc.fichier, importeLe: data.parc.importeLe, demo: false } : { demo: !opts.vehicules },
+      setParc(list, fichier) { data.parc = { vehicules: list, fichier: fichier || '', importeLe: now() }; persist(); },
+      vehicule: id => api.vehicules.find(v => v.id === id),
       type: id => types.find(t => t.id === id),
       solution: id => solutions.find(s => s.id === id),
       equipement: id => equipements.find(e => e.id === id),
@@ -104,12 +109,13 @@
       reglages: () => data.reglages,
       setReglages(r) { Object.assign(data.reglages, r); persist(); },
 
-      exportJSON: () => JSON.stringify({ incidents: data.incidents, reglages: data.reglages }, null, 2),
+      exportJSON: () => JSON.stringify({ incidents: data.incidents, reglages: data.reglages, parc: data.parc }, null, 2),
       importJSON(text) {
         const o = JSON.parse(text);
         if (!o || !Array.isArray(o.incidents)) throw new Error('Fichier invalide');
         data.incidents = o.incidents;
         if (o.reglages) Object.assign(data.reglages, o.reglages);
+        if (o.parc) data.parc = o.parc;
         persist();
       },
       exportCSV() {

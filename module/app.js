@@ -28,7 +28,7 @@
     opts = opts || {};
     const base = opts.base || BASE;
     const store = ME.createStore(opts);
-    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '' };
+    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '', importRes: null };
     const picto = name => base + 'img/pictos/' + name + '.svg';
     // options.download(nom, texte, type) -> Promise : permet à l'outil hôte de fournir son propre enregistrement
     const download = opts.download || linkDownload;
@@ -88,6 +88,7 @@
       const q = state.q.toLowerCase();
       const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
         (!state.solution || v.solution === state.solution) && (!q || (v.immat + ' ' + v.parc + ' ' + v.modele).toLowerCase().indexOf(q) >= 0));
+      if (!store.vehicule(state.vehicleId) && list.length) state.vehicleId = list[0].id;
       const v = store.vehicule(state.vehicleId);
       if (v && !store.lignes(v, state.vue).length) { // vue sans équipement pour cette solution : bascule sur une vue renseignée
         const alt = Object.keys(store.vues).find(k => store.lignes(v, k).length);
@@ -114,7 +115,9 @@
           '<p class="me-hint">Cliquez sur un équipement : diagnostic guidé, niveau de gravité, puis mail prêt pour Outlook.</p>' + vueHtml(v, state.vue);
       }
 
-      view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2><div class="me-filters">' +
+      view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2>' +
+        (store.parcInfo().demo ? '<p class="me-info">Parc de démonstration. <a href="#" data-action="goto-import">Importer votre parc</a></p>' : '') +
+        '<div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
@@ -149,16 +152,53 @@
         (rows || '<tr><td colspan="7" class="me-empty">Aucun signalement pour ces filtres.</td></tr>') + '</tbody></table></div></div>';
     }
 
+    function importHtml() {
+      const info = store.parcInfo(), res = state.importRes, nb = store.vehicules.length;
+      let rapport = '';
+      if (res && res.chargement) rapport = '<p class="me-info">Lecture de « ' + esc(res.fichier) + ' »…</p>';
+      else if (res && res.echec) rapport = '<p class="me-warn">' + esc(res.echec) + '</p>';
+      else if (res) {
+        const ids = res.vehicules.map(v => v.id);
+        const orphelins = store.incidents().filter(i => ids.indexOf(i.vehiculeId) < 0).length;
+        const parSol = store.solutions.map(s => [s.label, res.vehicules.filter(v => v.solution === s.id).length]).filter(x => x[1]);
+        const liste = (arr, titre) => arr.length ? '<details' + (arr.length <= 8 ? ' open' : '') + '><summary>' + titre + ' (' + arr.length + ')</summary><ul class="me-points">' +
+          arr.map(e => '<li>' + (e.ligne ? '<b>Ligne ' + e.ligne + '</b> · ' : '') + esc(e.texte) + '</li>').join('') + '</ul></details>' : '';
+        rapport = '<div class="me-rapport"><h3>Analyse de « ' + esc(res.fichier) + ' »</h3><div class="me-puces">' +
+          '<div class="me-puce ok"><span class="i">✓</span><div><b>' + res.vehicules.length + ' véhicule' + (res.vehicules.length > 1 ? 's' : '') + ' prêt' + (res.vehicules.length > 1 ? 's' : '') + '</b><span class="d">' + (parSol.map(x => x[0] + ' : ' + x[1]).join(' · ') || '—') + '</span></div></div>' +
+          '<div class="me-puce ' + (res.erreurs.length ? 'ko' : 'ok') + '"><span class="i">' + (res.erreurs.length ? '✗' : '✓') + '</span><div><b>' + res.erreurs.length + ' ligne' + (res.erreurs.length > 1 ? 's' : '') + ' en erreur</b><span class="d">' + (res.erreurs.length ? 'non importée' + (res.erreurs.length > 1 ? 's' : '') + ', à corriger dans le fichier' : 'aucune') + '</span></div></div>' +
+          '<div class="me-puce ' + (res.avertissements.length ? 'att' : 'ok') + '"><span class="i">' + (res.avertissements.length ? '!' : '✓') + '</span><div><b>' + res.avertissements.length + ' avertissement' + (res.avertissements.length > 1 ? 's' : '') + '</b><span class="d">' + (res.ignorees ? 'ligne d\'exemple ignorée' : 'importés quand même') + '</span></div></div></div>' +
+          liste(res.erreurs, 'Erreurs') + liste(res.avertissements, 'Avertissements') +
+          (orphelins ? '<p class="me-warn">' + orphelins + ' signalement' + (orphelins > 1 ? 's concernent' : ' concerne') + ' des véhicules absents de ce fichier : ' + (orphelins > 1 ? 'ils restent' : 'il reste') + ' dans l\'historique, sans véhicule associé.</p>' : '') +
+          '<div class="me-actions"><button type="button" class="me-btn" data-action="import-annuler">Annuler</button>' +
+          '<button type="button" class="me-btn me-vert" data-action="import-appliquer"' + (res.vehicules.length ? '' : ' disabled') + '>Remplacer le parc par ces ' + res.vehicules.length + ' véhicules</button></div></div>';
+      }
+      return '<div class="me-pad" id="me-import"><h2 class="me-label">Parc de véhicules</h2>' +
+        '<p class="me-sub">' + (info.demo ? 'Parc de démonstration (' + nb + ' véhicules) : importez le vôtre avec le modèle Excel.'
+          : nb + ' véhicule' + (nb > 1 ? 's' : '') + (info.fichier ? ', importé' + (nb > 1 ? 's' : '') + ' depuis « ' + esc(info.fichier) + ' » le ' + fmt(info.importeLe) : '') + '. Un nouvel import remplace tout le parc ; l\'historique suit les véhicules par leur n° de parc.') + '</p>' +
+        '<div class="me-depot" tabindex="0" role="button" data-action="import-choisir"><strong>Glisser le fichier du parc ici</strong> ou cliquer pour le choisir<small>Modèle Excel (.xlsx) ou CSV</small></div>' +
+        '<input type="file" accept=".xlsx,.xls,.csv" data-input="parc-in" hidden>' + rapport +
+        '<div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="modele">Télécharger le modèle vide</button>' +
+        '<button type="button" class="me-btn" data-action="parc-out">Exporter le parc actuel (CSV)</button></div></div>';
+    }
+
+    function importer(file) {
+      if (!file) return;
+      state.importRes = { chargement: true, fichier: file.name }; render();
+      ME.parc.lireFichier(file).then(lignes => { state.importRes = Object.assign(ME.parc.analyse(lignes, store), { fichier: file.name }); },
+        e => { state.importRes = { fichier: file.name, echec: (e && e.message) || 'Fichier illisible : utilisez le modèle Excel ou un CSV.' }; })
+        .then(() => { if (state.tab === 'regl') render(); });
+    }
+
     function renderRegl() {
       const r = store.reglages();
       const f = (k, label, ph) => '<label>' + label + '<input name="' + k + '" value="' + esc(r[k]) + '" placeholder="' + esc(ph || '') + '"></label>';
-      view.innerHTML = '<div class="me-pad"><form class="me-form" data-form="regl"><h2 class="me-label">Réglages du mail</h2>' +
+      view.innerHTML = '<div class="me-stack">' + importHtml() + '<div class="me-pad"><form class="me-form" data-form="regl"><h2 class="me-label">Réglages du mail</h2>' +
         f('destinataire', 'Destinataire(s) par défaut', 'atelier@exemple.fr ; maintenance@exemple.fr') + f('copie', 'Copie (Cc)') +
         f('declarant', 'Votre nom (signature)') + f('prefixeObjet', 'Préfixe de l\'objet') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
         '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
-        '<p class="me-info">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div>';
+        '<p class="me-info">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div></div>';
     }
 
     function render() {
@@ -279,6 +319,22 @@
       'diag-answer': t => { ME.diag.answer(diag.st, +t.dataset.i); refreshDiag(); },
       'diag-back': () => { ME.diag.back(diag.st); refreshDiag(); },
       'diag-reset': () => { diag.st = null; refreshDiag(); },
+      'goto-import': () => { state.tab = 'regl'; render(); const s = el.querySelector('#me-import'); if (s) s.scrollIntoView({ block: 'start' }); },
+      'import-choisir': () => el.querySelector('[data-input="parc-in"]').click(),
+      'import-annuler': () => { state.importRes = null; render(); },
+      'import-appliquer': () => {
+        const res = state.importRes; if (!res || !res.vehicules.length) return;
+        store.setParc(res.vehicules, res.fichier);
+        state.importRes = null; state.vehicleId = res.vehicules[0].id; state.tab = 'parc'; state.agence = state.type = state.solution = state.q = '';
+        render(); toast('Parc importé : ' + res.vehicules.length + ' véhicules.');
+      },
+      modele: () => {
+        const url = base + 'modele-parc-vehicules.xlsx', nom = 'modele-parc-vehicules.xlsx';
+        fetch(url).then(r => { if (!r.ok) throw 0; return r.blob(); })
+          .then(b => save(nom, b, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+            () => { const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove(); });
+      },
+      'parc-out': () => save('parc-vehicules.csv', ME.parc.exporterCSV(store), 'text/csv;charset=utf-8', 'Parc exporté : modifiez-le puis réimportez-le.'),
       csv: () => save('historique-materiel-embarque.csv', store.exportCSV(), 'text/csv;charset=utf-8', 'Historique exporté.'),
       'json-out': () => save('materiel-embarque-sauvegarde.json', store.exportJSON(), 'application/json', 'Sauvegarde enregistrée.'),
       mail: t => mailDialog(t.dataset.id, false),
@@ -315,18 +371,23 @@
       if (actions[t.dataset.action]) actions[t.dataset.action](t);
     });
     el.addEventListener('keydown', ev => {
-      const t = ev.target.closest && ev.target.closest('.me-click');
+      const t = ev.target.closest && ev.target.closest('.me-click, .me-depot');
       if (t && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); actions[t.dataset.action](t); }
     });
+    // Glisser-déposer du fichier de parc
+    el.addEventListener('dragover', ev => { const d = ev.target.closest && ev.target.closest('.me-depot'); if (d) { ev.preventDefault(); d.classList.add('survol'); } });
+    el.addEventListener('dragleave', ev => { const d = ev.target.closest && ev.target.closest('.me-depot'); if (d) d.classList.remove('survol'); });
+    el.addEventListener('drop', ev => { const d = ev.target.closest && ev.target.closest('.me-depot'); if (d) { ev.preventDefault(); importer(ev.dataTransfer.files[0]); } });
     el.addEventListener('input', ev => {
       const k = ev.target.dataset && ev.target.dataset.input;
-      if (!k || k === 'json-in') return;
+      if (!k || k === 'json-in' || k === 'parc-in') return;
       state[k] = ev.target.value;
       const pos = ev.target.selectionStart;
       render();
       if (ev.target.type === 'search') { const n = el.querySelector('[data-input="' + k + '"]'); n.focus(); n.setSelectionRange(pos, pos); }
     });
     el.addEventListener('change', ev => {
+      if (ev.target.dataset.input === 'parc-in') { importer(ev.target.files[0]); ev.target.value = ''; return; }
       if (ev.target.dataset.input !== 'json-in' || !ev.target.files[0]) return;
       const rd = new FileReader();
       rd.onload = () => { try { store.importJSON(rd.result); render(); toast('Sauvegarde restaurée.'); } catch (e) { toast('Fichier invalide : choisissez une sauvegarde JSON de ce module.'); } };

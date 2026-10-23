@@ -17,7 +17,16 @@ Ouvrir `index.html` dans un navigateur (double-clic suffit).
    - *Ouvrir dans Outlook* : lien `mailto:` (texte tronqué si trop long, limite des liens Outlook) ;
    - *Télécharger le brouillon (.eml)* : s'ouvre dans Outlook en brouillon (`X-Unsent: 1`), texte complet (recommandé) ;
    - *Copier*.
-5. **Historique** : filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : destinataire par défaut, signature, sauvegarde JSON.
+5. **Historique** : indicateurs, filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : destinataire par défaut, signature, sauvegarde JSON.
+
+## Import du parc de véhicules
+1. Réglages › Parc de véhicules › **Télécharger le modèle vide** (`module/modele-parc-vehicules.xlsx`).
+2. Remplir l'onglet « Parc » : une ligne par véhicule. Les équipements se remplissent **automatiquement selon la solution**
+   (Oui / « — » si non applicable) ; remplacer par « Non » un équipement absent. Correspondance solution / équipements : onglet « Listes ».
+3. Glisser le fichier dans la zone de dépôt : l'outil affiche un rapport (véhicules prêts, erreurs ligne par ligne, avertissements),
+   puis **Remplacer le parc**. Les signalements suivent les véhicules par leur n° de parc d'un import à l'autre.
+4. Mise à jour : **Exporter le parc actuel (CSV)**, modifier, réimporter. Excel (.xlsx) ou CSV acceptés ; lecture Excel par SheetJS
+   embarqué (`module/vendor/`, Apache 2.0), sans accès internet.
 
 ## Équipements pris en compte
 | Zone | Équipements | Solutions |
@@ -34,7 +43,7 @@ Un arbre = des nœuds (question + options) ; une option mène à un autre nœud,
 ```html
 <link rel="stylesheet" href="module/materiel-embarque.css">
 <script src="module/data.js"></script><script src="module/store.js"></script><script src="module/mail.js"></script>
-<script src="module/arbres.js"></script><script src="module/app.js"></script>
+<script src="module/arbres.js"></script><script src="module/parc-import.js"></script><script src="module/app.js"></script>
 <script>
   MaterielEmbarque.mount(document.getElementById('zone'), {
     vehicules: [...],        // optionnel : parc réel (même structure que module/data.js)
