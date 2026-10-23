@@ -4,7 +4,9 @@ Module de gestion du matériel embarqué des véhicules : parc, vues dynamiques 
 niveau de gravité, historique, préparation du mail pour Outlook. Sans dépendance, sans build.
 
 ## Essayer
-Ouvrir `index.html` dans un navigateur (double-clic suffit).
+- **Fichier unique** : `dist/materiel-embarque.html` (tout est intégré, fonctionne hors ligne). Régénérer après une modification :
+  `python3 outils/construire-html.py`.
+- **Version développement** : ouvrir `index.html` (charge les fichiers de `module/`).
 
 ## Fonctionnement
 1. **Parc** : choisir un véhicule (filtres agence / solution / type). Son **picto** s'affiche en grand avec deux zones cliquables

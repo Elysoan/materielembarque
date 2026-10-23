@@ -29,7 +29,9 @@
     const base = opts.base || BASE;
     const store = ME.createStore(opts);
     const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '', importRes: null };
-    const picto = name => base + 'img/pictos/' + name + '.svg';
+    // Ressources : fichier à côté du module, ou intégrée (MaterielEmbarque.assets[chemin] = data URI) dans la version HTML autonome
+    const asset = path => (ME.assets && ME.assets[path]) || base + path;
+    const picto = name => asset('img/pictos/' + name + '.svg');
     // options.download(nom, texte, type) -> Promise : permet à l'outil hôte de fournir son propre enregistrement
     const download = opts.download || linkDownload;
     const emlOk = opts.eml !== false; // brouillon .eml (désactivable si l'hôte ne peut pas l'enregistrer)
@@ -44,7 +46,7 @@
 
     el.classList.add('me-root');
     el.innerHTML =
-      '<header class="me-head"><img class="me-logo" src="' + base + 'img/logo-paprec.svg" alt="Paprec"><h1 class="me-titre">Matériel embarqué</h1><span class="me-spacer"></span>' +
+      '<header class="me-head"><img class="me-logo" src="' + asset('img/logo-paprec.svg') + '" alt="Paprec"><h1 class="me-titre">Matériel embarqué</h1><span class="me-spacer"></span>' +
       '<nav class="me-tabs" role="tablist">' +
       ['parc:Parc', 'histo:Historique', 'regl:Réglages'].map(t => { const p = t.split(':'); return '<button role="tab" data-action="tab" data-id="' + p[0] + '">' + p[1] + '</button>'; }).join('') +
       '</nav>' + (opts.version ? '<span class="me-pill">' + esc(opts.version) + '</span>' : '') + '</header><main class="me-view"></main><dialog class="me-dialog"></dialog>';
@@ -78,7 +80,7 @@
           '<td><button class="me-btn" ' + attrs(l) + '>' + (nb ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
       }).join('');
 
-      return '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + base + cfg.img + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' + tray +
+      return '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + asset(cfg.img) + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' + tray +
         '<div class="me-scroll"><table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
@@ -332,7 +334,7 @@
       },
       modele: () => {
         // options.modele() -> Promise<Blob> : l'hôte peut fournir le modèle autrement qu'en fichier .xlsx servi
-        const url = base + 'modele-parc-vehicules.xlsx', nom = 'modele-parc-vehicules.xlsx';
+        const url = asset('modele-parc-vehicules.xlsx'), nom = 'modele-parc-vehicules.xlsx';
         (opts.modele ? opts.modele() : fetch(url).then(r => { if (!r.ok) throw 0; return r.blob(); }))
           .then(b => save(nom, b, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Modèle enregistré : remplissez-le puis déposez-le ici.'),
             () => { const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove(); });
