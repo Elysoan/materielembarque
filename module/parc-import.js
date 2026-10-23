@@ -4,8 +4,9 @@
    l'application montre le rapport, puis l'utilisateur valide le remplacement du parc. */
 (function (root) {
   const ME = (root.MaterielEmbarque = root.MaterielEmbarque || {});
-  // SheetJS 0.18.5 (Apache 2.0) embarqué dans module/vendor : fonctionne hors ligne et derrière un proxy.
-  const SHEETJS = ((document.currentScript && document.currentScript.src.replace(/[^/]*$/, '')) || 'module/') + 'vendor/xlsx-0.18.5.full.min.js';
+  // SheetJS 0.18.5 (Apache 2.0) : copie embarquée (hors ligne, derrière un proxy), puis cdnjs en secours.
+  const SHEETJS = [((document.currentScript && document.currentScript.src.replace(/[^/]*$/, '')) || 'module/') + 'vendor/xlsx-0.18.5.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'];
 
   // Comparaison tolérante : minuscules, sans accents ni ponctuation (« CITI'ID » = « citi id » = « CITIID »)
   const cle = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -26,12 +27,14 @@
 
   function chargerSheetJS() {
     if (root.XLSX) return Promise.resolve(root.XLSX);
-    return new Promise((ok, ko) => {
+    const essai = i => new Promise((ok, ko) => {
+      if (i >= SHEETJS.length) return ko(new Error('Lecture Excel indisponible. Enregistrez le fichier en CSV (séparateur point-virgule) puis réessayez.'));
       const s = document.createElement('script');
-      s.src = SHEETJS; s.onload = () => ok(root.XLSX);
-      s.onerror = () => ko(new Error('Lecture Excel indisponible. Enregistrez le fichier en CSV (séparateur point-virgule) puis réessayez.'));
+      s.src = SHEETJS[i]; s.onload = () => ok(root.XLSX);
+      s.onerror = () => { s.remove(); essai(i + 1).then(ok, ko); };
       document.head.appendChild(s);
     });
+    return essai(0);
   }
 
   /** CSV (séparateur ; ou , détecté, guillemets gérés) -> tableau de lignes. */
