@@ -76,18 +76,18 @@
     // Parc de démonstration (remplaçable via mount(el, { vehicules: [...] })).
     // `equipements` (optionnel) : sous-ensemble des équipements réellement montés sur ce véhicule.
     vehicules: [
-      { id: 'v1', type: 'bom_26t',  solution: 'citiid',     immat: 'GH214AB', parc: 'BOM 214', agence: 'Lyon Est',     modele: 'Renault D Wide 26T' },
-      { id: 'v2', type: 'bom_19t',  solution: 'citiid',     immat: 'GJ587KL', parc: 'BOM 587', agence: 'Lyon Est',     modele: 'Mercedes Econic 19T' },
-      { id: 'v3', type: 'bom_bicomp_5050', solution: 'citiid', immat: 'GM120CD', parc: 'BOM 120', agence: 'Lyon Est',  modele: 'Scania P280 26T bi-comp' },
-      { id: 'v4', type: 'bom_bl',   solution: 'citimission', immat: 'GK901MN', parc: 'BL 901', agence: 'Villeurbanne', modele: 'Renault D Wide 26T + bras' },
-      { id: 'v5', type: 'bom_26t',  solution: 'citipap',    immat: 'GP310EF', parc: 'BOM 310', agence: 'Villeurbanne', modele: 'Volvo FE 26T',
+      { id: 'v1', type: 'bom_26t',  solution: 'citiid',     immat: 'GH214AB', agence: 'Lyon Est',     modele: 'Renault D Wide 26T' },
+      { id: 'v2', type: 'bom_19t',  solution: 'citiid',     immat: 'GJ587KL', agence: 'Lyon Est',     modele: 'Mercedes Econic 19T' },
+      { id: 'v3', type: 'bom_bicomp_5050', solution: 'citiid', immat: 'GM120CD', agence: 'Lyon Est',  modele: 'Scania P280 26T bi-comp' },
+      { id: 'v4', type: 'bom_bl',   solution: 'citimission', immat: 'GK901MN', agence: 'Villeurbanne', modele: 'Renault D Wide 26T + bras' },
+      { id: 'v5', type: 'bom_26t',  solution: 'citipap',    immat: 'GP310EF', agence: 'Villeurbanne', modele: 'Volvo FE 26T',
         equipements: ['tablette', 'support', 'k3'] },
-      { id: 'v6', type: 'bennette', solution: 'citipap',    immat: 'FZ032RT', parc: 'BEN 032', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
-      { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', parc: 'GRU 455', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
+      { id: 'v6', type: 'bennette', solution: 'citipap',    immat: 'FZ032RT', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
+      { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
     ],
 
     // Mail de signalement : toujours adressé au service clients Simpliciti (ouverture de ticket).
-    mail: { destinataire: 'service.clients@simpliciti.fr' },
+    mail: { destinataire: 'service.clients@simpliciti.fr', copie: 'ri@paprec.com' },
 
     reglages: {
       copie: '',

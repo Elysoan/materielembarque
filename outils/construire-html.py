@@ -25,7 +25,7 @@ DEMO = r"""
 (function () {
   const ME = window.MaterielEmbarque, CLE = 'materielembarque.demo';
   document.getElementById('demo-reset').onclick = function () { try { localStorage.removeItem(CLE); } catch (e) {} location.reload(); };
-  const app = ME.mount(document.getElementById('app'), { version: 'v0.3 · démo', cleStockage: CLE });
+  const app = ME.mount(document.getElementById('app'), { version: 'v0.4 · démo', cleStockage: CLE });
   const st = app.store;
   if (st.incidents().length) return;
   st.setReglages({ declarant: 'Démo' });
@@ -37,7 +37,13 @@ DEMO = r"""
     inc.journal[0].at = t;
     (suite || []).forEach(x => st.update(inc.id, x[0], x[1]));
     if (o.mail) st.markMail(inc.id, 'Outlook');
+    if (o.resolu != null) { // date de résolution réaliste (et non l'instant de création de la démo)
+      const x = st.incident(inc.id); x.resoluLe = il(o.resolu);
+      x.journal.forEach(e => { if (/Résolu/.test(e.texte)) e.at = x.resoluLe; });
+      st.update(inc.id, {});
+    }
   };
+  const resolu = (texte) => [[{ statut: 'resolu' }, 'Statut : Ouvert → Résolu · ' + texte]];
   // BOM 214 (CITI'ID) : chaise gauche sans lecture, câble décodeur / NBAB en cause
   cree({ j: 1, mail: 1, qui: 'K. Martin (chef d\'équipe)', f: { vehiculeId: 'v1', equipId: 'ant_ar', cote: 'Gauche', gravite: 3,
     symptomes: 'Chaise gauche : aucune puce lue depuis la prise de poste, voyant rouge fixe sur la BBV gauche. Chaise droite normale.', diagnostic: diag('lecteur', [0, 0, 1, 0]) } });
@@ -56,13 +62,22 @@ DEMO = r"""
   cree({ j: 6, mail: 1, qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v5', equipId: 'k3', gravite: 3,
     symptomes: 'Plus de remontée de position dans GeoRed depuis lundi. Voyant GPS vert clignotant, voyant communication rouge fixe.', diagnostic: diag('k3', [4, 0]) } });
   // BEN 032 (CITIPAP) : résolu
-  cree({ j: 12, mail: 1, qui: 'A. Petit (conducteur)', f: { vehiculeId: 'v6', equipId: 'ant_cab', gravite: 2,
+  cree({ j: 12, resolu: 10, mail: 1, qui: 'A. Petit (conducteur)', f: { vehiculeId: 'v6', equipId: 'ant_cab', gravite: 2,
     symptomes: 'Voyant GPS du K3 orange clignotant en permanence.', diagnostic: diag('antenne_cab', [1]) } },
     [[{ statut: 'en_cours' }, 'Statut : Ouvert → En cours'], [{ statut: 'resolu' }, 'Statut : En cours → Résolu · Antenne redressée et câble resserré, FIX retrouvé']]);
+  // (résolution datée ci-dessous via o.resolu pour les signalements historiques)
   // GRU 455 (CITIPAV) : support de tablette, résolu
-  cree({ j: 20, qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v7', equipId: 'support', gravite: 1,
+  cree({ j: 20, resolu: 19, qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v7', equipId: 'support', gravite: 1,
     symptomes: 'La tablette bouge sur son support dans les virages.', diagnostic: diag('support', [1]) } },
     [[{ statut: 'resolu' }, 'Statut : Ouvert → Résolu · Support resserré par l\'atelier']]);
+  // Historique résolu sur deux mois : alimente les statistiques (équipements, véhicules, délais)
+  cree({ j: 25, resolu: 23, mail: 1, f: { vehiculeId: 'v1', equipId: 'ant_ar', cote: 'Droite', gravite: 3, symptomes: 'Lecture intermittente à droite, puces lues seulement de très près.', diagnostic: diag('lecteur', [3, 1, 0, 0]) } }, resolu('Dent antenne remplacée'));
+  cree({ j: 41, resolu: 37, mail: 1, f: { vehiculeId: 'v1', equipId: 'decodeur', cote: 'Gauche', gravite: 3, symptomes: 'Lecteur gauche absent de la checklist.', diagnostic: diag('lecteur', [0, 0, 0]) } }, resolu('Décodeur remplacé'));
+  cree({ j: 58, resolu: 57, mail: 1, f: { vehiculeId: 'v1', equipId: 'nbab', gravite: 4, symptomes: 'NBAB éteint à la prise de poste, aucune identification.', diagnostic: diag('nbab', [0, 1]) } }, resolu('Fusible BDCI remplacé'));
+  cree({ j: 33, resolu: 32, mail: 1, f: { vehiculeId: 'v2', equipId: 'k3', gravite: 3, symptomes: 'Voyant GPS du K3 éteint.', diagnostic: diag('k3', [0]) } }, resolu('Faisceau d\'alimentation K3 rebranché'));
+  cree({ j: 49, resolu: 44, mail: 1, f: { vehiculeId: 'v3', equipId: 'bbv', cote: 'Gauche', gravite: 2, symptomes: 'BBV gauche absente de la checklist mais allumée.', diagnostic: diag('bbv', [1, 0]) } }, resolu('BBV réadressée'));
+  cree({ j: 16, resolu: 15, mail: 1, f: { vehiculeId: 'v5', equipId: 'tablette', gravite: 2, symptomes: 'Tablette ne démarre pas au contact.', diagnostic: diag('tablette', [0, 0]) } }, resolu('Tablette mise en route manuellement, consigne donnée'));
+  cree({ j: 70, resolu: 62, f: { vehiculeId: 'v2', equipId: 'tablette', gravite: 1, symptomes: 'Écran de la tablette rayé, lisible.' } }, resolu('Protection d\'écran posée'));
   app.refresh();
 })();
 """
@@ -92,7 +107,7 @@ body {{ margin: 0; background: #F5F7FA; }}
 {js(assets)}
 </script>
 """ + ''.join('<script>\n' + js((M / s).read_text(encoding='utf-8')) + '\n</script>\n' for s in SCRIPTS) + \
-    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.3' });</script>\n") + """</body>
+    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.4' });</script>\n") + """</body>
 </html>
 """
     sortie = RACINE / 'dist' / ('materiel-embarque-demo.html' if demo else 'materiel-embarque.html')

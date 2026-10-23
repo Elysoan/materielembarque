@@ -26,7 +26,7 @@
     const urgent = inc.gravite >= 4 ? 'URGENT - ' : '';
 
     // Objet préfixé par la solution du véhicule : Simpliciti oriente le ticket dès sa réception
-    const subject = ['[' + (sol.label || 'Matériel embarqué') + ']', '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + equipLabel, '-', v.immat, '(' + v.parc + ')']
+    const subject = ['[' + (sol.label || 'Matériel embarqué') + ']', '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + equipLabel, '-', v.immat]
       .filter(Boolean).join(' ');
 
     const body = [
@@ -36,9 +36,8 @@
       '',
       'VÉHICULE',
       '- Immatriculation : ' + v.immat,
-      '- N° de parc : ' + v.parc,
       '- Agence : ' + v.agence,
-      '- Type : ' + t.label + ' (' + v.modele + ')',
+      '- Type : ' + t.label + (v.modele ? ' (' + v.modele + ')' : ''),
       '- Solution : ' + sol.label,
       '',
       'ÉQUIPEMENT EN DÉFAUT',
@@ -60,7 +59,9 @@
       inc.declarant || ''
     ]).join('\n');
 
-    return { to: store.destinataire, cc: r.copie || '', subject, body };
+    // Copie : adresse fixe (ri@paprec.com) + copies supplémentaires des Réglages, sans doublon
+    const cc = [store.copieFixe].concat(String(r.copie || '').split(/[;,]/)).map(x => x.trim()).filter((x, i, a) => x && a.indexOf(x) === i).join('; ');
+    return { to: store.destinataire, cc, subject, body };
   }
 
   /** Lien mailto: ; renvoie aussi `truncated` si le corps a dû être raccourci. */

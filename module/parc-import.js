@@ -14,7 +14,6 @@
 
   // En-têtes reconnus (ordre des colonnes libre)
   const CHAMPS = [
-    { champ: 'parc',        test: k => k === 'ndeparc' || k === 'numerodeparc' || k === 'nparc' || k === 'parc' },
     { champ: 'immat',       test: k => k.indexOf('immat') === 0 },
     { champ: 'agence',      test: k => k === 'agence' },
     { champ: 'solution',    test: k => k === 'solution' },
@@ -75,7 +74,7 @@
     let ignorees = 0;
     // Ligne d'en-tête : la première qui contient « Immatriculation » et « Solution »
     const h = lignes.findIndex(l => l.some(c => cle(c).indexOf('immat') === 0) && l.some(c => cle(c) === 'solution'));
-    if (h < 0) return { vehicules, erreurs: [{ ligne: 0, texte: 'En-têtes introuvables : utilisez le modèle (colonnes « N° de parc », « Immatriculation », « Solution »…).' }], avertissements, ignorees };
+    if (h < 0) return { vehicules, erreurs: [{ ligne: 0, texte: 'En-têtes introuvables : utilisez le modèle (colonnes « Immatriculation », « Agence », « Solution », « Type de véhicule »…).' }], avertissements, ignorees };
 
     const col = {}, colEquip = {};
     lignes[h].forEach((c, i) => {
@@ -84,32 +83,30 @@
       if (f && col[f.champ] == null) col[f.champ] = i;
       else if (EQUIP[k]) colEquip[EQUIP[k]] = i;
     });
-    ['parc', 'immat', 'agence', 'solution', 'type'].forEach(c => { if (col[c] == null) erreurs.push({ ligne: h + 1, texte: 'Colonne obligatoire absente : ' + c + '.' }); });
+    ['immat', 'agence', 'solution', 'type'].forEach(c => { if (col[c] == null) erreurs.push({ ligne: h + 1, texte: 'Colonne obligatoire absente : ' + c + '.' }); });
     if (erreurs.length) return { vehicules, erreurs, avertissements, ignorees };
 
     const solutions = {}; store.solutions.forEach(s => { solutions[cle(s.label)] = s.id; solutions[cle(s.id)] = s.id; });
     const types = {}; store.types.forEach(t => { types[cle(t.label)] = t.id; types[cle(t.id)] = t.id; types[cle(t.picto)] = t.id; });
-    const vus = { parc: {}, immat: {}, id: {} };
+    const vus = { immat: {} };
 
     for (let r = h + 1; r < lignes.length; r++) {
       const l = lignes[r], n = r + 1, val = c => texte(l[col[c]]);
       if (!l.some(c => texte(c))) continue;
       if (cle(val('commentaire')).indexOf('exemple') === 0) { ignorees++; continue; }
 
-      const manque = ['parc', 'immat', 'agence', 'solution', 'type'].filter(c => !val(c));
+      const manque = ['immat', 'agence', 'solution', 'type'].filter(c => !val(c));
       if (manque.length) { erreurs.push({ ligne: n, texte: 'Champ(s) manquant(s) : ' + manque.join(', ') + '.' }); continue; }
       const solution = solutions[cle(val('solution'))], type = types[cle(val('type'))];
       if (!solution) { erreurs.push({ ligne: n, texte: 'Solution inconnue « ' + val('solution') + ' ».' }); continue; }
       if (!type) { erreurs.push({ ligne: n, texte: 'Type de véhicule inconnu « ' + val('type') + ' ».' }); continue; }
-      const parc = val('parc'), immat = immatNormalisee(val('immat'));
-      if (vus.parc[cle(parc)]) { erreurs.push({ ligne: n, texte: 'N° de parc « ' + parc + ' » en double (déjà ligne ' + vus.parc[cle(parc)] + ').' }); continue; }
+      const immat = immatNormalisee(val('immat'));
       if (vus.immat[cle(immat)]) { erreurs.push({ ligne: n, texte: 'Immatriculation « ' + immat + ' » en double (déjà ligne ' + vus.immat[cle(immat)] + ').' }); continue; }
-      vus.parc[cle(parc)] = n; vus.immat[cle(immat)] = n;
+      vus.immat[cle(immat)] = n;
       if (!/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(immat)) avertissements.push({ ligne: n, texte: 'Immatriculation « ' + immat + ' » hors format AA123AA (conservée telle quelle).' });
 
-      // Identifiant stable : dérivé du n° de parc, pour que l'historique suive le véhicule d'un import à l'autre
-      let id = 'p-' + cle(parc); while (vus.id[id]) id += 'x'; vus.id[id] = 1;
-      const v = { id, type, solution, immat, parc, agence: val('agence'), modele: val('modele') };
+      // Identifiant stable : dérivé de l'immatriculation, pour que l'historique suive le véhicule d'un import à l'autre
+      const v = { id: 'p-' + cle(immat), type, solution, immat, agence: val('agence'), modele: val('modele') };
       const absents = Object.keys(colEquip).filter(e => cle(l[colEquip[e]]) === 'non');
       if (absents.length) {
         v.equipements = store.equipsOf({ solution }).map(e => e.id).filter(e => absents.indexOf(e) < 0);
@@ -129,10 +126,10 @@
     const E = [['tablette', 'Tablette'], ['support', 'Support de charge'], ['k3', 'Calculateur K3'], ['ant_cab', 'Antenne cabine'],
       ['ant_ar', 'Antenne arrière (dent)'], ['decodeur', 'Décodeur'], ['bbv', 'Boîte à boutons (BBV)'], ['nbab', 'NBAB']];
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const tete = ['N° de parc', 'Immatriculation', 'Agence', 'Solution', 'Type de véhicule', 'Marque / modèle'].concat(E.map(e => e[1]), ['Commentaire']);
+    const tete = ['Immatriculation', 'Agence', 'Solution', 'Type de véhicule', 'Marque / modèle'].concat(E.map(e => e[1]), ['Commentaire']);
     const lignes = store.vehicules.map(v => {
       const prevus = store.equipsOf({ solution: v.solution }).map(e => e.id), montes = store.equipsOf(v).map(e => e.id);
-      return [v.parc, v.immat, v.agence, (store.solution(v.solution) || {}).label, (store.type(v.type) || {}).label, v.modele]
+      return [v.immat, v.agence, (store.solution(v.solution) || {}).label, (store.type(v.type) || {}).label, v.modele]
         .concat(E.map(e => prevus.indexOf(e[0]) < 0 ? '—' : montes.indexOf(e[0]) < 0 ? 'Non' : 'Oui'), [v.commentaire]).map(q).join(';');
     });
     return '﻿' + tete.map(q).join(';') + '\r\n' + lignes.join('\r\n');

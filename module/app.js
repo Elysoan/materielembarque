@@ -28,7 +28,7 @@
     opts = opts || {};
     const base = opts.base || BASE;
     const store = ME.createStore(opts);
-    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '', importRes: null };
+    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '', fPeriode: '90', importRes: null };
     // Ressources : fichier à côté du module, ou intégrée (MaterielEmbarque.assets[chemin] = data URI) dans la version HTML autonome
     const asset = path => (ME.assets && ME.assets[path]) || base + path;
     const picto = name => asset('img/pictos/' + name + '.svg');
@@ -90,7 +90,7 @@
       const sans = x => String(x).toLowerCase().replace(/[\s\-]+/g, ''); // « GH-148 » trouve GH148HB
       const q = sans(state.q);
       const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
-        (!state.solution || v.solution === state.solution) && (!q || sans(v.immat + ' ' + v.parc + ' ' + v.modele).indexOf(q) >= 0));
+        (!state.solution || v.solution === state.solution) && (!q || sans(v.immat + ' ' + v.modele + ' ' + v.agence).indexOf(q) >= 0));
       if (!store.vehicule(state.vehicleId) && list.length) state.vehicleId = list[0].id;
       const v = store.vehicule(state.vehicleId);
       if (v && !store.lignes(v, state.vue).length) { // vue sans équipement pour cette solution : bascule sur une vue renseignée
@@ -103,7 +103,7 @@
         const n = store.ouverts(x.id).length, sev = store.graviteMax(x.id);
         return '<button class="me-card' + (x.id === state.vehicleId ? ' is-sel' : '') + '" data-action="vehicle" data-id="' + x.id + '">' +
           '<img class="me-picto-mini" src="' + picto((store.type(x.type) || {}).picto) + '" alt="">' +
-          '<strong>' + esc(x.parc) + '</strong><span>' + esc(x.immat) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.solution(x.solution) || {}).label) + '</span>' +
+          '<strong>' + esc(x.immat) + '</strong><span>' + esc((store.type(x.type) || {}).label) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.solution(x.solution) || {}).label) + '</span>' +
           (n ? '<span class="me-badge me-sev' + sev + '">' + n + ' défaut' + (n > 1 ? 's' : '') + ' · max ' + sev + '</span>' : '<span class="me-badge me-sev0">RAS</span>') + '</button>';
       }).join('') || '<p class="me-empty">Aucun véhicule.</p>';
 
@@ -111,7 +111,7 @@
       if (v) {
         const t = store.type(v.type), vues = Object.keys(store.vues);
         const zoneBtn = (vue, cls) => { const n = store.graviteVue(v, vue); return '<button class="me-zone ' + cls + ' me-s' + n + (state.vue === vue ? ' is-sel' : '') + '" data-action="vue" data-id="' + vue + '"><span>' + store.vues[vue].label + (n ? ' · ' + n : '') + '</span></button>'; };
-        detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(t.label) + ' · ' + esc((store.solution(v.solution) || {}).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
+        detail = '<div class="me-vhead"><h3>' + esc(v.immat) + '</h3><p>' + esc(t.label) + ' · ' + esc((store.solution(v.solution) || {}).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
           '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><div class="me-picto-box"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
           (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</div></figure>' +
           '<div class="me-vuetabs" role="tablist">' + vues.map(k => { const n = store.graviteVue(v, k); return '<button role="tab" class="me-vtab" aria-selected="' + (state.vue === k) + '" data-action="vue" data-id="' + k + '">' + store.vues[k].label + (n ? ' <span class="me-badge me-sev' + n + '">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>' +
@@ -121,9 +121,69 @@
       view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2>' +
         (store.parcInfo().demo ? '<p class="me-info">Parc de démonstration. <a href="#" data-action="modele">Télécharger le modèle</a> · <a href="#" data-action="goto-import">Importer votre parc</a></p>' : '') +
         '<div class="me-filters">' +
-        '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
+        '<input type="search" placeholder="Immatriculation, modèle…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
+    }
+
+    // Durée lisible : « 5 h », « 2,4 j »
+    const duree = ms => ms < 36e5 ? '< 1 h' : ms < 864e5 ? Math.round(ms / 36e5) + ' h' : (ms / 864e5).toFixed(ms < 864e6 ? 1 : 0).replace('.', ',') + ' j';
+    const delaiRes = i => i.resoluLe ? Date.parse(i.resoluLe) - Date.parse(i.creeLe) : null; // du signalement à la résolution
+    const mediane = a => { const t = a.slice().sort((x, y) => x - y), m = t.length >> 1; return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2; };
+
+    // Barres horizontales classées (une seule teinte, valeur écrite à côté, info-bulle au survol)
+    function barres(items, unite) {
+      if (!items.length) return '<p class="me-empty">Pas encore de données sur cette période.</p>';
+      const max = Math.max.apply(null, items.map(x => x.val)) || 1;
+      return '<div class="me-barres" role="table">' + items.map(x =>
+        '<div class="me-barre" role="row" title="' + esc(x.aide || '') + '"><span class="lib" role="cell">' + x.lib + '</span>' +
+        '<span class="piste" role="cell" aria-hidden="true"><i style="width:' + Math.max(2, x.val / max * 100).toFixed(1) + '%"></i></span>' +
+        '<span class="val" role="cell">' + (x.txt != null ? x.txt : x.val) + (unite || '') + '</span></div>').join('') + '</div>';
+    }
+
+    function statsHtml(all) {
+      const jours = +state.fPeriode, depuis = jours ? Date.now() - jours * 864e5 : 0;
+      const per = all.filter(i => Date.parse(i.creeLe) >= depuis);
+      const nomPeriode = { 30: '30 derniers jours', 90: '90 derniers jours', 365: '12 derniers mois', 0: 'depuis le début' }[jours];
+
+      // Équipements les plus défectueux (toutes chaises confondues)
+      const parEq = {};
+      per.forEach(i => { const k = i.equipId; (parEq[k] = parEq[k] || { n: 0, o: 0 }).n++; if (i.statut !== 'resolu') parEq[k].o++; });
+      const eqs = Object.keys(parEq).sort((x, y) => parEq[y].n - parEq[x].n).slice(0, 6).map(k => {
+        const e = store.equipement(k) || { label: k };
+        return { lib: esc(e.label), val: parEq[k].n, aide: e.label + ' : ' + parEq[k].n + ' signalement(s), dont ' + parEq[k].o + ' ouvert(s)' };
+      });
+
+      // Véhicules les plus touchés : nombre de signalements, puis gravité la plus haute
+      const parV = {};
+      per.forEach(i => { const x = parV[i.vehiculeId] = parV[i.vehiculeId] || { n: 0, g: 0, o: 0 }; x.n++; x.g = Math.max(x.g, i.gravite); if (i.statut !== 'resolu') x.o++; });
+      const vs = Object.keys(parV).sort((x, y) => parV[y].n - parV[x].n || parV[y].g - parV[x].g).slice(0, 5);
+      const vehs = vs.map((id, k) => {
+        const v = store.vehicule(id) || { immat: '(véhicule retiré)' }, x = parV[id];
+        return { lib: esc(v.immat) + ' <small>' + esc((store.type(v.type) || {}).label || '') + '</small>' + (k === 0 && x.n > 1 ? ' <span class="me-tag">le plus problématique</span>' : ''),
+          val: x.n, aide: v.immat + ' : ' + x.n + ' signalement(s), ' + x.o + ' ouvert(s), gravité max ' + x.g };
+      });
+
+      // Délai de résolution par gravité
+      const res = per.filter(i => i.resoluLe), dts = res.map(delaiRes);
+      const parG = D.gravites.map(g => {
+        const d = res.filter(i => i.gravite === g.niveau).map(delaiRes);
+        return d.length ? { lib: sevBadge(g.niveau), val: d.reduce((a, b) => a + b, 0) / d.length / 864e5, txt: duree(d.reduce((a, b) => a + b, 0) / d.length) + ' <small>(' + d.length + ')</small>',
+          aide: 'Gravité ' + g.niveau + ' : délai moyen ' + duree(d.reduce((a, b) => a + b, 0) / d.length) + ' sur ' + d.length + ' signalement(s) résolu(s)' } : null;
+      }).filter(Boolean);
+      const vieux = all.filter(i => i.statut !== 'resolu').sort((a, b) => a.creeLe.localeCompare(b.creeLe))[0];
+      const vieuxV = vieux && (store.vehicule(vieux.vehiculeId) || {});
+
+      const sel = '<select data-input="fPeriode" aria-label="Période des statistiques">' + [[30, '30 jours'], [90, '90 jours'], [365, '12 mois'], [0, 'Tout']].map(o =>
+        '<option value="' + o[0] + '"' + (+state.fPeriode === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+      return '<div class="me-stats-tete"><h3>Statistiques <small>· ' + per.length + ' signalement' + (per.length > 1 ? 's' : '') + ', ' + nomPeriode + '</small></h3>' + sel + '</div>' +
+        '<div class="me-stats">' +
+        '<section class="me-panel"><h4>Équipements les plus défectueux</h4>' + barres(eqs) + '</section>' +
+        '<section class="me-panel"><h4>Véhicules les plus touchés</h4>' + barres(vehs) + '</section>' +
+        '<section class="me-panel"><h4>Délai de résolution par gravité</h4>' + barres(parG) +
+          (dts.length ? '<p class="me-hint">Moyenne ' + duree(dts.reduce((a, b) => a + b, 0) / dts.length) + ' · médiane ' + duree(mediane(dts)) + ' · du signalement à la résolution</p>' : '') +
+          (vieux ? '<p class="me-hint">Ouvert depuis le plus longtemps : <a href="#" data-action="incident" data-id="' + vieux.id + '">' + vieux.id + '</a> (' + esc(vieuxV.immat || '') + ', ' + esc(store.libelle(vieux)) + '), ' + duree(Date.now() - Date.parse(vieux.creeLe)) + '</p>' : '') +
+        '</section></div>';
     }
 
     function renderHisto() {
@@ -132,27 +192,31 @@
         const v = store.vehicule(i.vehiculeId) || {};
         return (state.fStatut === '' || (state.fStatut === 'ouvert' ? i.statut !== 'resolu' : i.statut === state.fStatut)) &&
           (!state.fSev || i.gravite === +state.fSev) &&
-          (!q || (i.id + ' ' + v.immat + ' ' + v.parc + ' ' + store.libelle(i) + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
+          (!q || (i.id + ' ' + v.immat + ' ' + store.libelle(i) + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
       });
       const rows = list.map(i => {
         const v = store.vehicule(i.vehiculeId) || {};
-        return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td class="me-id">' + i.id + '</td><td class="me-num">' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
-          '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
+        const d = i.resoluLe ? 'résolu en ' + duree(delaiRes(i)) : 'ouvert depuis ' + duree(Date.now() - Date.parse(i.creeLe));
+        return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td class="me-id">' + i.id + '</td><td class="me-num">' + fmt(i.creeLe) + '</td><td class="me-immat">' + esc(v.immat || '—') + '</td>' +
+          '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td>' +
+          '<td class="me-num' + (!i.resoluLe && Date.now() - Date.parse(i.creeLe) > 7 * 864e5 ? ' me-retard' : '') + '">' + d + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
       }).join('');
-      const all = store.incidents(), open = all.filter(i => i.statut !== 'resolu'), since = Date.now() - 30 * 864e5;
-      const kpi = (lib, val, c) => '<div class="me-kpi"' + (c ? ' style="--c:var(' + c + ')"' : '') + '><div class="lib">' + lib + '</div><div class="val">' + val + '</div></div>';
+      const all = store.incidents(), open = all.filter(i => i.statut !== 'resolu');
+      const dts = all.filter(i => i.resoluLe).map(delaiRes);
+      const kpi = (lib, val, c, sous) => '<div class="me-kpi"' + (c ? ' style="--c:var(' + c + ')"' : '') + '><div class="lib">' + lib + '</div><div class="val">' + val + '</div>' + (sous ? '<div class="sous">' + sous + '</div>' : '') + '</div>';
       const kpis = '<div class="me-kpis">' + kpi('Défauts ouverts', open.length, open.length ? '--me-s2' : '--me-s0') +
         kpi('Majeurs ou critiques', open.filter(i => i.gravite >= 3).length, open.some(i => i.gravite >= 3) ? '--me-s3' : '--me-s0') +
         kpi('Véhicules concernés', new Set(open.map(i => i.vehiculeId)).size + ' / ' + store.vehicules.length) +
-        kpi('Résolus sur 30 jours', all.filter(i => i.resoluLe && Date.parse(i.resoluLe) >= since).length, '--me-s0') + '</div>';
+        kpi('Délai moyen de résolution', dts.length ? duree(dts.reduce((a, b) => a + b, 0) / dts.length) : '—', '--bleu', dts.length ? 'médiane ' + duree(mediane(dts)) + ' · ' + dts.length + ' résolu' + (dts.length > 1 ? 's' : '') : 'aucun signalement résolu') + '</div>';
       const opt = (arr, cur, all) => '<option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (String(a[0]) === String(cur) ? ' selected' : '') + '>' + a[1] + '</option>').join('');
-      view.innerHTML = '<div class="me-pad"><h2 class="me-label">Historique des signalements</h2>' + kpis + '<div class="me-row">' +
+      view.innerHTML = '<div class="me-stack"><div class="me-pad"><h2 class="me-label">Historique des signalements</h2>' + kpis + statsHtml(all) + '</div>' +
+        '<div class="me-pad"><h2 class="me-label">Signalements</h2><div class="me-row">' +
         '<input type="search" style="flex:2;min-width:180px" placeholder="Rechercher…" value="' + esc(state.fQ) + '" data-input="fQ">' +
         '<select style="flex:1;min-width:140px" data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
         '<select style="flex:1;min-width:140px" data-input="fSev">' + opt(D.gravites.map(g => [g.niveau, g.niveau + ' · ' + g.label]), state.fSev, 'Toutes gravités') + '</select>' +
         '<span class="me-spacer"></span><button class="me-btn" data-action="csv">Export CSV</button></div>' +
-        '<div class="me-scroll"><table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Mail</th></tr></thead><tbody>' +
-        (rows || '<tr><td colspan="7" class="me-empty">Aucun signalement pour ces filtres.</td></tr>') + '</tbody></table></div></div>';
+        '<div class="me-scroll"><table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Délai</th><th>Mail</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="8" class="me-empty">Aucun signalement pour ces filtres.</td></tr>') + '</tbody></table></div></div></div>';
     }
 
     function importHtml() {
@@ -177,7 +241,7 @@
       }
       return '<div class="me-pad" id="me-import"><h2 class="me-label">Parc de véhicules</h2>' +
         '<p class="me-sub">' + (info.demo ? 'Parc de démonstration (' + nb + ' véhicules) : importez le vôtre avec le modèle Excel.'
-          : nb + ' véhicule' + (nb > 1 ? 's' : '') + (info.fichier ? ', importé' + (nb > 1 ? 's' : '') + ' depuis « ' + esc(info.fichier) + ' » le ' + fmt(info.importeLe) : '') + '. Un nouvel import remplace tout le parc ; l\'historique suit les véhicules par leur n° de parc.') + '</p>' +
+          : nb + ' véhicule' + (nb > 1 ? 's' : '') + (info.fichier ? ', importé' + (nb > 1 ? 's' : '') + ' depuis « ' + esc(info.fichier) + ' » le ' + fmt(info.importeLe) : '') + '. Un nouvel import remplace tout le parc ; l\'historique suit les véhicules par leur immatriculation.') + '</p>' +
         '<ol class="me-guide"><li><b>Télécharger le modèle Excel</b> <button type="button" class="me-btn me-vert" data-action="modele">⬇ Modèle de parc (.xlsx)</button></li>' +
         '<li><b>Le remplir</b> : une ligne par véhicule ; les équipements se remplissent selon la solution, mettre « Non » si absent.</li>' +
         '<li><b>Le déposer ci-dessous</b>, vérifier le rapport, puis valider.</li></ol>' +
@@ -198,8 +262,8 @@
       const r = store.reglages();
       const f = (k, label, ph) => '<label>' + label + '<input name="' + k + '" value="' + esc(r[k]) + '" placeholder="' + esc(ph || '') + '"></label>';
       view.innerHTML = '<div class="me-stack">' + importHtml() + '<div class="me-pad"><form class="me-form" data-form="regl"><h2 class="me-label">Réglages du mail</h2>' +
-        '<p class="me-info">Les signalements sont adressés à <b>' + esc(store.destinataire) + '</b> ; l\'objet commence par la solution du véhicule (ex. [CITI\'ID]).</p>' +
-        f('copie', 'Copie (Cc)', 'atelier@… ; responsable@…') + f('declarant', 'Votre nom (signature)') +
+        '<p class="me-info">Les signalements sont adressés à <b>' + esc(store.destinataire) + '</b> ; <b>' + esc(store.copieFixe) + '</b> est toujours en copie ; l\'objet commence par la solution du véhicule (ex. [CITI\'ID]).</p>' +
+        f('copie', 'Copie supplémentaire (facultatif)', 'atelier@… ; responsable@…') + f('declarant', 'Votre nom (signature)') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
         '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
@@ -265,7 +329,7 @@
       const chaise = e.cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
         '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + e.cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
       openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + (e.picto ? '<img class="me-ico-h" src="' + picto(e.picto) + '" alt="">' : '') + esc(e.label) + '</h3>' +
-        '<p class="me-sub">' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + existing + chaise +
+        '<p class="me-sub">' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + existing + chaise +
         (e.arbre ? '<section class="me-diag" data-diag>' + diagBlock() + '</section>' : '') +
         '<fieldset><legend>Niveau de gravité</legend>' + D.gravites.map(g =>
           '<label class="me-sevopt me-sev' + g.niveau + '"><input type="radio" name="gravite" value="' + g.niveau + '" required' + (g.niveau === 2 ? ' checked' : '') + '>' +
@@ -279,7 +343,7 @@
     function incidentDialog(id) {
       const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, d = i.diagnostic;
       openDlg(closeBtn + '<form class="me-form" data-form="update" data-id="' + id + '"><h3>' + id + ' <small>' + sevBadge(i.gravite) + '</small></h3>' +
-        '<p class="me-sub">' + esc(store.libelle(i)) + ' · ' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' +
+        '<p class="me-sub">' + esc(store.libelle(i)) + ' · ' + esc(v.immat) + '</p>' +
         '<p class="me-pre">' + esc(i.symptomes) + '</p>' +
         (d ? '<details class="me-diag-hist-d"><summary>Diagnostic guidé : ' + esc(d.cause) + '</summary><ol class="me-diag-hist">' + d.chemin.map(c => '<li>' + esc(c.q) + ' <strong>→ ' + esc(c.r) + '</strong></li>').join('') + '</ol><p><strong>Action recommandée :</strong> ' + esc(d.action) + '</p></details>' : '') +
         '<p class="me-sub">Constaté le ' + fmt(i.constateLe) + ' par ' + esc(i.declarant) + '</p>' +

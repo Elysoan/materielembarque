@@ -20,7 +20,8 @@ niveau de gravité, historique, préparation du mail pour Outlook. Sans dépenda
    - *Ouvrir dans Outlook* : lien `mailto:` (texte tronqué si trop long, limite des liens Outlook) ;
    - *Télécharger le brouillon (.eml)* : s'ouvre dans Outlook en brouillon (`X-Unsent: 1`), texte complet (recommandé) ;
    - *Copier*.
-5. **Historique** : indicateurs, filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : copie (Cc), signature, sauvegarde JSON. Destinataire fixe : service.clients@simpliciti.fr ; objet préfixé par la solution ([CITI'ID], [CITIPAP]…).
+5. **Historique** : indicateurs (dont délai moyen de résolution), statistiques sur 30 j / 90 j / 12 mois (équipements les plus défectueux,
+   véhicules les plus touchés, délai de résolution par gravité, signalement ouvert le plus ancien), colonne « Délai », filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : copie (Cc), signature, sauvegarde JSON. Destinataire fixe : service.clients@simpliciti.fr, ri@paprec.com toujours en copie ; objet préfixé par la solution ([CITI'ID], [CITIPAP]…).
 
 ## Import du parc de véhicules
 1. Réglages › Parc de véhicules › **Télécharger le modèle vide** (`module/modele-parc-vehicules.xlsx`).

@@ -46,6 +46,7 @@
     const api = {
       types, solutions, vues, equipements,
       destinataire: opts.destinataire || D.mail.destinataire,
+      copieFixe: opts.copie != null ? opts.copie : D.mail.copie, // toujours en copie, en plus des copies des Réglages
       /** Parc courant : le parc importé s'il existe, sinon celui fourni à mount() (ou la démonstration). */
       get vehicules() { return data.parc ? data.parc.vehicules : vehiculesDefaut; },
       parcInfo: () => data.parc ? { fichier: data.parc.fichier, importeLe: data.parc.importeLe, demo: false } : { demo: !opts.vehicules },
@@ -121,11 +122,11 @@
         persist();
       },
       exportCSV() {
-        const cols = ['id', 'creeLe', 'immat', 'parc', 'solution', 'equipement', 'gravite', 'statut', 'symptomes', 'cause_probable', 'declarant', 'resoluLe', 'mailLe'];
+        const cols = ['id', 'creeLe', 'immat', 'solution', 'equipement', 'gravite', 'statut', 'symptomes', 'cause_probable', 'declarant', 'resoluLe', 'mailLe'];
         const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
         const rows = api.incidents().map(i => {
           const v = api.vehicule(i.vehiculeId) || {}, s = api.solution(v.solution) || {};
-          return [i.id, i.creeLe, v.immat, v.parc, s.label, api.libelle(i), i.gravite, i.statut, i.symptomes,
+          return [i.id, i.creeLe, v.immat, s.label, api.libelle(i), i.gravite, i.statut, i.symptomes,
             i.diagnostic && i.diagnostic.cause, i.declarant, i.resoluLe, i.mailLe].map(q).join(';');
         });
         return '﻿' + cols.join(';') + '\r\n' + rows.join('\r\n'); // BOM + ';' => ouverture directe dans Excel FR
