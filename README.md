@@ -6,6 +6,7 @@ niveau de gravité, historique, préparation du mail pour Outlook. Sans dépenda
 ## Essayer
 - **Fichier unique** : `dist/materiel-embarque.html` (tout est intégré, fonctionne hors ligne). Régénérer après une modification :
   `python3 outils/construire-html.py`.
+- **Démonstration** : `dist/materiel-embarque-demo.html` (signalements fictifs, données séparées de l'outil réel, bouton « Réinitialiser la démo »).
 - **Version développement** : ouvrir `index.html` (charge les fichiers de `module/`).
 
 ## Fonctionnement

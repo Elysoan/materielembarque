@@ -199,6 +199,9 @@
 
 body { margin: 0; background: #F5F7FA; }
 #app { min-height: 100vh; }
+.demo-bandeau { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: center; padding: 8px 16px; background: #DB722E; color: #fff;
+  font: 600 13.5px 'Red Hat Display', 'Segoe UI', system-ui, sans-serif; }
+.demo-bandeau button { font: inherit; font-size: 12.5px; border: 1px solid rgba(255,255,255,.8); background: transparent; color: #fff; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -362,13 +365,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   const ME = root.MaterielEmbarque;
   const KEY = 'materielembarque.v2';
 
-  function localStorageAdapter() {
+  function localStorageAdapter(key) {
     return {
       load() {
-        try { return JSON.parse(root.localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+        try { return JSON.parse(root.localStorage.getItem(key) || 'null'); } catch (e) { return null; }
       },
       save(obj) {
-        try { root.localStorage.setItem(KEY, JSON.stringify(obj)); } catch (e) { /* mode privé / quota */ }
+        try { root.localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* mode privé / quota */ }
       }
     };
   }
@@ -376,7 +379,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   ME.createStore = function (opts) {
     opts = opts || {};
     const D = ME.defaults;
-    const storage = opts.storage || localStorageAdapter();
+    // options.cleStockage : espace séparé (ex. la démo ne doit pas mélanger ses données avec l'outil réel)
+    const storage = opts.storage || localStorageAdapter(opts.cleStockage || KEY);
     const saved = storage.load() || {};
     const data = {
       incidents: saved.incidents || [],

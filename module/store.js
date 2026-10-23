@@ -4,13 +4,13 @@
   const ME = root.MaterielEmbarque;
   const KEY = 'materielembarque.v2';
 
-  function localStorageAdapter() {
+  function localStorageAdapter(key) {
     return {
       load() {
-        try { return JSON.parse(root.localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+        try { return JSON.parse(root.localStorage.getItem(key) || 'null'); } catch (e) { return null; }
       },
       save(obj) {
-        try { root.localStorage.setItem(KEY, JSON.stringify(obj)); } catch (e) { /* mode privé / quota */ }
+        try { root.localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* mode privé / quota */ }
       }
     };
   }
@@ -18,7 +18,8 @@
   ME.createStore = function (opts) {
     opts = opts || {};
     const D = ME.defaults;
-    const storage = opts.storage || localStorageAdapter();
+    // options.cleStockage : espace séparé (ex. la démo ne doit pas mélanger ses données avec l'outil réel)
+    const storage = opts.storage || localStorageAdapter(opts.cleStockage || KEY);
     const saved = storage.load() || {};
     const data = {
       incidents: saved.incidents || [],
