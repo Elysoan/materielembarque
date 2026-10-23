@@ -2,7 +2,7 @@
    passer un `storage` ({ load(): object|null, save(obj) }) à mount(). */
 (function (root) {
   const ME = root.MaterielEmbarque;
-  const KEY = 'materielembarque.v1';
+  const KEY = 'materielembarque.v2';
 
   function localStorageAdapter() {
     return {
@@ -26,13 +26,15 @@
     };
     const vehicules = opts.vehicules || D.vehicules;
     const types = opts.types || D.types;
+    const solutions = opts.solutions || D.solutions;
+    const equipements = opts.equipements || D.equipements;
+    const vues = opts.vues || D.vues;
 
     const persist = () => storage.save(data);
     const now = () => new Date().toISOString();
 
     function nextId() {
-      const y = new Date().getFullYear();
-      const prefix = 'INC-' + y + '-';
+      const prefix = 'INC-' + new Date().getFullYear() + '-';
       const max = data.incidents
         .filter(i => i.id.indexOf(prefix) === 0)
         .reduce((m, i) => Math.max(m, parseInt(i.id.slice(prefix.length), 10) || 0), 0);
@@ -40,36 +42,48 @@
     }
 
     const api = {
-      vehicules, types,
+      vehicules, types, solutions, vues, equipements,
       vehicule: id => vehicules.find(v => v.id === id),
       type: id => types.find(t => t.id === id),
-      /** Équipements réellement montés sur un véhicule (sous-ensemble optionnel du type). */
+      solution: id => solutions.find(s => s.id === id),
+      equipement: id => equipements.find(e => e.id === id),
+
+      /** Équipements montés sur un véhicule : ceux de sa solution, limités à `v.equipements` si renseigné. */
       equipsOf(v) {
-        const list = (api.type(v.type) || { equipements: [] }).equipements;
-        return v.equipements ? list.filter(e => v.equipements.indexOf(e.id) >= 0) : list;
+        return equipements.filter(e => (!e.solutions || e.solutions.indexOf(v.solution) >= 0) &&
+          (!v.equipements || v.equipements.indexOf(e.id) >= 0));
       },
-      equipement(v, equipId) {
-        const veh = typeof v === 'string' ? api.vehicule(v) : v;
-        return veh && ((api.type(veh.type) || { equipements: [] }).equipements.find(e => e.id === equipId));
+      /** Lignes (équipement + chaise éventuelle) d'une vue : un équipement parCote donne une ligne par chaise. */
+      lignes(v, vue) {
+        const out = [];
+        api.equipsOf(v).filter(e => e.vue === vue).forEach(e => {
+          if (e.parCote) e.cotes.forEach(c => out.push({ eq: e, cote: c })); else out.push({ eq: e, cote: null });
+        });
+        return out;
       },
+      libelle(inc) {
+        const e = api.equipement(inc.equipId) || { label: inc.equipId };
+        return e.label + (inc.cote ? ' - ' + inc.cote : '');
+      },
+
       incidents: () => data.incidents.slice().sort((a, b) => b.creeLe.localeCompare(a.creeLe)),
       incident: id => data.incidents.find(i => i.id === id),
-      isOpen: i => i.statut !== 'resolu',
-
-      ouverts(vehiculeId, equipId) {
+      ouverts(vehiculeId, equipId, cote) {
         return data.incidents.filter(i => i.statut !== 'resolu' &&
-          (!vehiculeId || i.vehiculeId === vehiculeId) && (!equipId || i.equipId === equipId));
+          (!vehiculeId || i.vehiculeId === vehiculeId) && (!equipId || i.equipId === equipId) && (!cote || i.cote === cote));
       },
-      /** Gravité la plus haute parmi les incidents ouverts (0 = RAS). */
-      graviteMax(vehiculeId, equipId) {
-        return api.ouverts(vehiculeId, equipId).reduce((m, i) => Math.max(m, i.gravite), 0);
+      /** Gravité la plus haute parmi les incidents ouverts (0 = RAS). `equipIds` : liste d'équipements. */
+      graviteMax(vehiculeId, equipId, cote) {
+        return api.ouverts(vehiculeId, equipId, cote).reduce((m, i) => Math.max(m, i.gravite), 0);
+      },
+      graviteVue(v, vue) {
+        const ids = api.equipsOf(v).filter(e => e.vue === vue).map(e => e.id);
+        return data.incidents.filter(i => i.statut !== 'resolu' && i.vehiculeId === v.id && ids.indexOf(i.equipId) >= 0)
+          .reduce((m, i) => Math.max(m, i.gravite), 0);
       },
 
       add(fields) {
-        const inc = Object.assign({
-          id: nextId(), statut: 'ouvert', creeLe: now(), mailLe: null,
-          journal: []
-        }, fields);
+        const inc = Object.assign({ id: nextId(), statut: 'ouvert', creeLe: now(), mailLe: null, journal: [] }, fields);
         inc.journal.push({ at: inc.creeLe, texte: 'Signalement créé (gravité ' + inc.gravite + ')' });
         data.incidents.push(inc);
         persist();
@@ -85,9 +99,7 @@
         persist();
         return inc;
       },
-      markMail(id, mode) {
-        api.update(id, { mailLe: now() }, 'Mail préparé (' + mode + ')');
-      },
+      markMail(id, mode) { api.update(id, { mailLe: now() }, 'Mail préparé (' + mode + ')'); },
 
       reglages: () => data.reglages,
       setReglages(r) { Object.assign(data.reglages, r); persist(); },
@@ -101,12 +113,12 @@
         persist();
       },
       exportCSV() {
-        const cols = ['id', 'creeLe', 'immat', 'parc', 'equipement', 'gravite', 'statut', 'symptomes', 'declarant', 'resoluLe', 'mailLe'];
+        const cols = ['id', 'creeLe', 'immat', 'parc', 'solution', 'equipement', 'gravite', 'statut', 'symptomes', 'cause_probable', 'declarant', 'resoluLe', 'mailLe'];
         const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
         const rows = api.incidents().map(i => {
-          const v = api.vehicule(i.vehiculeId) || {}, e = api.equipement(v, i.equipId) || {};
-          return [i.id, i.creeLe, v.immat, v.parc, e.label, i.gravite, i.statut, i.symptomes, i.declarant, i.resoluLe, i.mailLe]
-            .map(q).join(';');
+          const v = api.vehicule(i.vehiculeId) || {}, s = api.solution(v.solution) || {};
+          return [i.id, i.creeLe, v.immat, v.parc, s.label, api.libelle(i), i.gravite, i.statut, i.symptomes,
+            i.diagnostic && i.diagnostic.cause, i.declarant, i.resoluLe, i.mailLe].map(q).join(';');
         });
         return '﻿' + cols.join(';') + '\r\n' + rows.join('\r\n'); // BOM + ';' => ouverture directe dans Excel FR
       }

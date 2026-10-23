@@ -2,6 +2,8 @@
 (function (root) {
   const ME = root.MaterielEmbarque;
   const D = ME.defaults;
+  // Dossier du module (images, pictos), déduit de l'emplacement de ce script ; surchargeable via options.base
+  const BASE = (document.currentScript && document.currentScript.src.replace(/[^/]*$/, '')) || 'module/';
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sevLabel = n => (D.gravites.find(g => g.niveau === n) || {}).label || '';
@@ -21,27 +23,12 @@
     return n ? '<span class="me-badge me-sev' + n + '">' + n + ' · ' + sevLabel(n) + '</span>' : '<span class="me-badge me-sev0">RAS</span>';
   }
 
-  /* ---------- Schéma SVG d'une BOM avec points cliquables ---------- */
-  function truckSvg(store, v) {
-    const spots = store.equipsOf(v).map(e => {
-      const sev = store.graviteMax(v.id, e.id);
-      const label = e.label + (sev ? ' - défaut gravité ' + sev : ' - RAS');
-      return '<g class="me-spot me-s' + sev + '" tabindex="0" role="button" data-action="equip" data-id="' + e.id + '" aria-label="' + esc(label) + '">' +
-        '<title>' + esc(label) + '</title>' +
-        '<circle class="me-pulse" cx="' + e.x + '" cy="' + e.y + '" r="17"/>' +
-        '<circle class="me-dot" cx="' + e.x + '" cy="' + e.y + '" r="17"/>' +
-        '<text x="' + e.x + '" y="' + (e.y + 4) + '" text-anchor="middle">' + e.code + '</text>' +
-        (sev ? '<circle class="me-sevdot" cx="' + (e.x + 14) + '" cy="' + (e.y - 14) + '" r="9"/><text class="me-sevnum" x="' + (e.x + 14) + '" y="' + (e.y - 10.5) + '" text-anchor="middle">' + sev + '</text>' : '') +
-        '</g>';
-    }).join('');
-    return '<svg class="me-truck" viewBox="0 0 900 360" role="group" aria-label="Schéma du véhicule ' + esc(v.immat) + '">' +
-      ME.schemas[store.type(v.type).schema]() + spots + '</svg>';
-  }
-
   function mount(el, opts) {
     opts = opts || {};
+    const base = opts.base || BASE;
     const store = ME.createStore(opts);
-    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, q: '', agence: '', type: '', fStatut: 'ouvert', fSev: '', fQ: '' };
+    const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '' };
+    const picto = name => base + 'img/pictos/' + name + '.svg';
 
     el.classList.add('me-root');
     el.innerHTML =
@@ -52,53 +39,87 @@
     const view = el.querySelector('.me-view');
     const dlg = el.querySelector('dialog');
 
+    /* ---------- Vue détaillée (image + points cliquables) ---------- */
+    function vueHtml(v, vue) {
+      const cfg = store.vues[vue], lignes = store.lignes(v, vue);
+      if (!lignes.length) {
+        return '<p class="me-empty">Aucun équipement « ' + cfg.label.toLowerCase() + ' » défini pour la solution ' + esc((store.solution(v.solution) || {}).label) + ' (à compléter dans data.js).</p>';
+      }
+      const attrs = l => 'data-action="equip" data-id="' + l.eq.id + '"' + (l.cote ? ' data-cote="' + l.cote + '"' : '');
+      const name = l => l.eq.label + (l.cote ? ' - ' + l.cote : '');
+      const sev = l => store.graviteMax(v.id, l.eq.id, l.cote);
+
+      const spots = lignes.filter(l => !l.eq.hors).map(l => {
+        const p = l.cote ? l.eq.pos[l.cote] : l.eq.pos, n = sev(l);
+        return '<button class="me-hot me-s' + n + '" style="left:' + (p[0] / cfg.w * 100).toFixed(2) + '%;top:' + (p[1] / cfg.h * 100).toFixed(2) + '%" ' + attrs(l) +
+          ' title="' + esc(name(l) + (n ? ' - défaut gravité ' + n : ' - RAS')) + '" aria-label="' + esc(name(l) + (n ? ', défaut gravité ' + n : ', RAS')) + '">' +
+          '<span class="me-pulse"></span><b>' + l.eq.code + (l.cote ? '<small>' + l.cote[0] + '</small>' : '') + '</b>' + (n ? '<i>' + n + '</i>' : '') + '</button>';
+      }).join('');
+
+      const hors = lignes.filter(l => l.eq.hors);
+      const tray = hors.length ? '<div class="me-tray"><span>Non visibles sur l\'image :</span>' + hors.map(l =>
+        '<button class="me-chip me-s' + sev(l) + '" ' + attrs(l) + '>' + esc(name(l)) + (sev(l) ? ' · ' + sev(l) : '') + '</button>').join('') + '</div>' : '';
+
+      const rows = lignes.map(l => {
+        const n = sev(l), nb = store.ouverts(v.id, l.eq.id, l.cote).length;
+        return '<tr><td class="me-ico">' + (l.eq.picto ? '<img src="' + picto(l.eq.picto) + '" alt="">' : '') + '</td><td>' + esc(l.eq.label) + (l.cote ? ' <small>' + l.cote + '</small>' : '') + '</td><td>' + sevBadge(n) + '</td>' +
+          '<td><button class="me-btn" ' + attrs(l) + '>' + (nb ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
+      }).join('');
+
+      return '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + base + cfg.img + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' + tray +
+        '<table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
     /* ---------- Vues ---------- */
     function renderParc() {
       const agences = Array.from(new Set(store.vehicules.map(v => v.agence))).sort();
       const q = state.q.toLowerCase();
       const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
-        (!q || (v.immat + ' ' + v.parc + ' ' + v.modele).toLowerCase().indexOf(q) >= 0));
+        (!state.solution || v.solution === state.solution) && (!q || (v.immat + ' ' + v.parc + ' ' + v.modele).toLowerCase().indexOf(q) >= 0));
       const v = store.vehicule(state.vehicleId);
+      if (v && !store.lignes(v, state.vue).length) { // vue sans équipement pour cette solution : bascule sur une vue renseignée
+        const alt = Object.keys(store.vues).find(k => store.lignes(v, k).length);
+        if (alt) state.vue = alt;
+      }
+      const sel = (key, arr, all) => '<select data-input="' + key + '"><option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (a[0] === state[key] ? ' selected' : '') + '>' + esc(a[1]) + '</option>').join('') + '</select>';
 
       const cards = list.map(x => {
         const n = store.ouverts(x.id).length, sev = store.graviteMax(x.id);
         return '<button class="me-card' + (x.id === state.vehicleId ? ' is-sel' : '') + '" data-action="vehicle" data-id="' + x.id + '">' +
-          '<strong>' + esc(x.parc) + '</strong><span>' + esc(x.immat) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.type(x.type) || {}).label) + '</span>' +
+          '<img class="me-picto-mini" src="' + picto((store.type(x.type) || {}).picto) + '" alt="">' +
+          '<strong>' + esc(x.parc) + '</strong><span>' + esc(x.immat) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.solution(x.solution) || {}).label) + '</span>' +
           (n ? '<span class="me-badge me-sev' + sev + '">' + n + ' défaut' + (n > 1 ? 's' : '') + ' · max ' + sev + '</span>' : '<span class="me-badge me-sev0">RAS</span>') + '</button>';
       }).join('') || '<p class="me-empty">Aucun véhicule.</p>';
 
       let detail = '<p class="me-empty">Sélectionnez un véhicule.</p>';
       if (v) {
-        const rows = store.equipsOf(v).map(e => {
-          const ops = store.ouverts(v.id, e.id);
-          return '<tr><td>' + esc(e.label) + '</td><td>' + sevBadge(store.graviteMax(v.id, e.id)) + '</td>' +
-            '<td><button class="me-btn" data-action="equip" data-id="' + e.id + '">' + (ops.length ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
-        }).join('');
-        detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(store.type(v.type).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
-          '<p class="me-hint">Cliquez sur un équipement du schéma pour signaler un défaut.</p>' +
-          truckSvg(store, v) +
-          '<table class="me-table"><thead><tr><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+        const t = store.type(v.type), vues = Object.keys(store.vues);
+        const zoneBtn = (vue, cls) => { const n = store.graviteVue(v, vue); return '<button class="me-zone ' + cls + ' me-s' + n + (state.vue === vue ? ' is-sel' : '') + '" data-action="vue" data-id="' + vue + '"><span>' + store.vues[vue].label + (n ? ' · ' + n : '') + '</span></button>'; };
+        detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(t.label) + ' · ' + esc((store.solution(v.solution) || {}).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
+          '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
+          (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</figure>' +
+          '<div class="me-vuetabs" role="tablist">' + vues.map(k => { const n = store.graviteVue(v, k); return '<button role="tab" class="me-vtab" aria-selected="' + (state.vue === k) + '" data-action="vue" data-id="' + k + '">' + store.vues[k].label + (n ? ' <span class="me-badge me-sev' + n + '">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>' +
+          '<p class="me-hint">Cliquez sur un équipement pour signaler un défaut et lancer le diagnostic guidé.</p>' + vueHtml(v, state.vue);
       }
 
       view.innerHTML = '<div class="me-parc"><aside><div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
-        '<select data-input="agence"><option value="">Toutes agences</option>' + agences.map(a => '<option' + (a === state.agence ? ' selected' : '') + '>' + esc(a) + '</option>').join('') + '</select>' +
-        '<select data-input="type"><option value="">Tous types</option>' + store.types.map(t => '<option value="' + t.id + '"' + (t.id === state.type ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('') + '</select></div>' +
+        sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
     }
 
     function renderHisto() {
       const q = state.fQ.toLowerCase();
       const list = store.incidents().filter(i => {
-        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
+        const v = store.vehicule(i.vehiculeId) || {};
         return (state.fStatut === '' || (state.fStatut === 'ouvert' ? i.statut !== 'resolu' : i.statut === state.fStatut)) &&
           (!state.fSev || i.gravite === +state.fSev) &&
-          (!q || (i.id + ' ' + v.immat + ' ' + v.parc + ' ' + e.label + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
+          (!q || (i.id + ' ' + v.immat + ' ' + v.parc + ' ' + store.libelle(i) + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
       });
       const rows = list.map(i => {
-        const v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
+        const v = store.vehicule(i.vehiculeId) || {};
         return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td>' + i.id + '</td><td>' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
-          '<td>' + esc(e.label) + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
+          '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
       }).join('');
       const opt = (arr, cur, all) => '<option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (String(a[0]) === String(cur) ? ' selected' : '') + '>' + a[1] + '</option>').join('');
       view.innerHTML = '<div class="me-filters me-row">' +
@@ -131,13 +152,51 @@
     function openDlg(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); }
     const closeBtn = '<button type="button" class="me-x" data-action="close" aria-label="Fermer">×</button>';
 
-    function declareDialog(equipId) {
-      const v = store.vehicule(state.vehicleId), e = store.equipement(v, equipId);
+    // Diagnostic guidé en cours dans le dialogue de signalement
+    let diag = { st: null, auto: '' };
+
+    function diagBlock() {
+      const st = diag.st;
+      if (!st) {
+        return '<div class="me-diag-intro"><div><strong>Diagnostic guidé</strong><p class="me-hint">Répondez aux questions pour identifier la cause probable (arbres de causes du guide Simpliciti). Facultatif.</p></div>' +
+          '<button type="button" class="me-btn" data-action="diag-start">Démarrer</button></div>';
+      }
+      const hist = st.chemin.length ? '<ol class="me-diag-hist">' + st.chemin.map(c => '<li>' + esc(c.q) + ' <strong>→ ' + esc(c.r) + '</strong></li>').join('') + '</ol>' : '';
+      const back = st.chemin.length ? '<button type="button" class="me-btn" data-action="diag-back">← Étape précédente</button>' : '';
+      if (st.fin) {
+        const f = st.fin;
+        return hist + '<div class="me-diag-fin"><h4>Cause probable</h4><p>' + esc(f.cause) + '</p><h4>Action recommandée</h4><p>' + esc(f.action) + '</p>' +
+          '<p>Gravité suggérée : ' + sevBadge(f.gravite) + ' <small>(appliquée ci-dessous, modifiable)</small></p>' +
+          (f.contact ? '<p class="me-warn">À escalader à Simpliciti : joindre ce diagnostic au ticket (il sera repris dans le mail).</p>' : '') +
+          (f.piste ? '<p class="me-warn">Piste hors guide constructeur : à valider avant d\'intervenir.</p>' : '') +
+          '<p class="me-hint">Source : ' + esc(f.source) + '</p><div class="me-actions"><button type="button" class="me-btn" data-action="diag-reset">Recommencer</button>' + back + '</div></div>';
+      }
+      const a = ME.diag.arbre(st), n = ME.diag.noeud(st);
+      return '<div class="me-diag-q"><p class="me-hint">' + esc(a.titre) + ' · ' + esc(a.source) + '</p>' + (a.rappel && !st.chemin.length ? '<p class="me-warn">' + esc(a.rappel) + '</p>' : '') + hist +
+        '<p class="me-q">' + esc(n.q) + '</p><div class="me-opts">' + n.options.map((o, i) => '<button type="button" class="me-btn me-opt" data-action="diag-answer" data-i="' + i + '">' + esc(o.r) + '</button>').join('') + '</div>' +
+        '<div class="me-actions">' + back + '<button type="button" class="me-btn" data-action="diag-reset">Quitter le diagnostic</button></div></div>';
+    }
+    function refreshDiag() {
+      const host = dlg.querySelector('[data-diag]');
+      if (host) host.innerHTML = diagBlock();
+      const st = diag.st, f = dlg.querySelector('[data-form="declare"]');
+      if (st && st.fin && f) { // applique la gravité suggérée et pré-remplit le constat
+        const r = f.querySelector('input[name=gravite][value="' + st.fin.gravite + '"]'); if (r) r.checked = true;
+        if (st.chemin[0] && (!f.symptomes.value.trim() || f.symptomes.value === diag.auto)) { diag.auto = 'Constat : ' + st.chemin[0].r + '.'; f.symptomes.value = diag.auto; }
+      }
+    }
+
+    function declareDialog(equipId, cote) {
+      const v = store.vehicule(state.vehicleId), e = store.equipement(equipId);
+      diag = { st: null, auto: '' };
       const ops = store.ouverts(v.id, equipId);
       const existing = ops.length ? '<div class="me-warn"><strong>' + ops.length + ' défaut(s) déjà ouvert(s) sur cet équipement :</strong><ul>' +
-        ops.map(i => '<li><a href="#" data-action="incident" data-id="' + i.id + '">' + i.id + '</a> · ' + sevBadge(i.gravite) + ' ' + esc(i.symptomes.slice(0, 80)) + '</li>').join('') + '</ul></div>' : '';
-      openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + esc(e.label) + '</h3>' +
-        '<p class="me-sub">' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' + existing +
+        ops.map(i => '<li><a href="#" data-action="incident" data-id="' + i.id + '">' + i.id + '</a> · ' + esc(store.libelle(i)) + ' · ' + sevBadge(i.gravite) + ' ' + esc(i.symptomes.slice(0, 80)) + '</li>').join('') + '</ul></div>' : '';
+      const chaise = e.cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
+        '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + e.cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
+      openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + (e.picto ? '<img class="me-ico-h" src="' + picto(e.picto) + '" alt="">' : '') + esc(e.label) + '</h3>' +
+        '<p class="me-sub">' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' + existing + chaise +
+        (e.arbre ? '<section class="me-diag" data-diag>' + diagBlock() + '</section>' : '') +
         '<fieldset><legend>Niveau de gravité</legend>' + D.gravites.map(g =>
           '<label class="me-sevopt me-sev' + g.niveau + '"><input type="radio" name="gravite" value="' + g.niveau + '" required' + (g.niveau === 2 ? ' checked' : '') + '>' +
           '<span><strong>' + g.niveau + ' · ' + g.label + '</strong><small>' + g.aide + '</small></span></label>').join('') + '</fieldset>' +
@@ -148,10 +207,11 @@
     }
 
     function incidentDialog(id) {
-      const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, e = store.equipement(v, i.equipId) || {};
+      const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, d = i.diagnostic;
       openDlg(closeBtn + '<form class="me-form" data-form="update" data-id="' + id + '"><h3>' + id + ' <small>' + sevBadge(i.gravite) + '</small></h3>' +
-        '<p class="me-sub">' + esc(e.label) + ' · ' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' +
+        '<p class="me-sub">' + esc(store.libelle(i)) + ' · ' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' +
         '<p class="me-pre">' + esc(i.symptomes) + '</p>' +
+        (d ? '<details class="me-diag-hist-d"><summary>Diagnostic guidé : ' + esc(d.cause) + '</summary><ol class="me-diag-hist">' + d.chemin.map(c => '<li>' + esc(c.q) + ' <strong>→ ' + esc(c.r) + '</strong></li>').join('') + '</ol><p><strong>Action recommandée :</strong> ' + esc(d.action) + '</p></details>' : '') +
         '<p class="me-sub">Constaté le ' + fmt(i.constateLe) + ' par ' + esc(i.declarant) + '</p>' +
         '<div class="me-row"><label>Statut<select name="statut">' + D.statuts.map(s => '<option value="' + s.id + '"' + (s.id === i.statut ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select></label>' +
         '<label>Gravité<select name="gravite">' + D.gravites.map(g => '<option value="' + g.niveau + '"' + (g.niveau === i.gravite ? ' selected' : '') + '>' + g.niveau + ' · ' + g.label + '</option>').join('') + '</select></label></div>' +
@@ -186,9 +246,14 @@
     const actions = {
       tab: t => { state.tab = t.dataset.id; render(); },
       vehicle: t => { state.vehicleId = t.dataset.id; render(); },
-      equip: t => declareDialog(t.dataset.id),
+      vue: t => { state.vue = t.dataset.id; render(); },
+      equip: t => declareDialog(t.dataset.id, t.dataset.cote),
       incident: t => incidentDialog(t.dataset.id),
       close: () => dlg.close(),
+      'diag-start': () => { diag.st = ME.diag.start(store.equipement(dlg.querySelector('[data-form="declare"]').dataset.equip).arbre); refreshDiag(); },
+      'diag-answer': t => { ME.diag.answer(diag.st, +t.dataset.i); refreshDiag(); },
+      'diag-back': () => { ME.diag.back(diag.st); refreshDiag(); },
+      'diag-reset': () => { diag.st = null; refreshDiag(); },
       csv: () => download('historique-materiel-embarque.csv', store.exportCSV(), 'text/csv;charset=utf-8'),
       'json-out': () => download('materiel-embarque-sauvegarde.json', store.exportJSON(), 'application/json'),
       mail: t => mailDialog(t.dataset.id, false),
@@ -212,13 +277,18 @@
     };
 
     el.addEventListener('click', ev => {
+      if (ev.shiftKey && ev.target.matches('.me-vue img')) { // aide au calage des points : Maj + clic sur l'image
+        const r = ev.target.getBoundingClientRect(), cfg = store.vues[state.vue];
+        alert('pos: [' + Math.round((ev.clientX - r.left) / r.width * cfg.w) + ', ' + Math.round((ev.clientY - r.top) / r.height * cfg.h) + ']');
+        return;
+      }
       const t = ev.target.closest('[data-action]');
       if (!t || !el.contains(t)) return;
       ev.preventDefault();
       if (actions[t.dataset.action]) actions[t.dataset.action](t);
     });
     el.addEventListener('keydown', ev => {
-      const t = ev.target.closest && ev.target.closest('.me-spot, .me-click');
+      const t = ev.target.closest && ev.target.closest('.me-click');
       if (t && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); actions[t.dataset.action](t); }
     });
     el.addEventListener('input', ev => {
@@ -244,9 +314,11 @@
       } else if (kind === 'declare') {
         store.setReglages({ declarant: f.declarant.value.trim() });
         const inc = store.add({
-          vehiculeId: state.vehicleId, equipId: f.dataset.equip, gravite: +f.gravite.value,
-          symptomes: f.symptomes.value.trim(), constateLe: new Date(f.constateLe.value).toISOString(), declarant: f.declarant.value.trim()
+          vehiculeId: state.vehicleId, equipId: f.dataset.equip, cote: f.cote ? f.cote.value : '', gravite: +f.gravite.value,
+          symptomes: f.symptomes.value.trim(), constateLe: new Date(f.constateLe.value).toISOString(), declarant: f.declarant.value.trim(),
+          diagnostic: (diag.st && ME.diag.resume(diag.st)) || null
         });
+        diag = { st: null, auto: '' };
         render();
         mailDialog(inc.id, true);
       } else if (kind === 'update') {

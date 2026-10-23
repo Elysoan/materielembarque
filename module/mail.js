@@ -5,15 +5,27 @@
 
   const fmt = iso => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
+  function diagLines(d) {
+    if (!d) return [];
+    const out = ['DIAGNOSTIC GUIDÉ (' + d.source + ')'];
+    d.chemin.forEach((c, i) => out.push((i + 1) + '. ' + c.q + '  =>  ' + c.r));
+    out.push('- Cause probable : ' + d.cause, '- Action recommandée : ' + d.action);
+    if (d.contact) out.push('- À transmettre à Simpliciti (ticket) avec ces informations.');
+    if (d.piste) out.push('- Piste hors guide constructeur : à valider.');
+    out.push('');
+    return out;
+  }
+
   function build(store, inc) {
     const v = store.vehicule(inc.vehiculeId) || {};
     const t = store.type(v.type) || {};
-    const e = store.equipement(v, inc.equipId) || {};
+    const sol = store.solution(v.solution) || {};
+    const equipLabel = store.libelle(inc);
     const g = ME.defaults.gravites.find(x => x.niveau === inc.gravite) || {};
     const r = store.reglages();
     const urgent = inc.gravite >= 4 ? 'URGENT - ' : '';
 
-    const subject = [r.prefixeObjet, '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + e.label, '-', v.immat, '(' + v.parc + ')']
+    const subject = [r.prefixeObjet, '[Gravité ' + inc.gravite + ' - ' + g.label + ']', urgent + equipLabel, '-', v.immat, '(' + v.parc + ')']
       .filter(Boolean).join(' ');
 
     const body = [
@@ -26,14 +38,16 @@
       '- N° de parc : ' + v.parc,
       '- Agence : ' + v.agence,
       '- Type : ' + t.label + ' (' + v.modele + ')',
+      '- Solution : ' + sol.label,
       '',
       'ÉQUIPEMENT EN DÉFAUT',
-      '- Équipement : ' + e.label,
+      '- Équipement : ' + equipLabel,
       '- Gravité : ' + inc.gravite + ' / 4 - ' + g.label + ' (' + g.aide + ')',
       '',
       'SYMPTÔMES',
       inc.symptomes,
       '',
+    ].concat(diagLines(inc.diagnostic), [
       'INFORMATIONS',
       '- Constaté le : ' + fmt(inc.constateLe),
       '- Signalé par : ' + (inc.declarant || 'non renseigné'),
@@ -43,7 +57,7 @@
       '',
       'Cordialement,',
       inc.declarant || ''
-    ].join('\n');
+    ]).join('\n');
 
     return { to: r.destinataire || '', cc: r.copie || '', subject, body };
   }

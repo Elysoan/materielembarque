@@ -1,45 +1,55 @@
 # Matériel embarqué
 
-Module de gestion du matériel embarqué des véhicules (BOM) : parc, schéma cliquable, niveau de gravité,
-historique, préparation du mail pour Outlook. Sans dépendance, sans build.
+Module de gestion du matériel embarqué des véhicules : parc, vues dynamiques cliquables, diagnostic guidé (arbres de causes),
+niveau de gravité, historique, préparation du mail pour Outlook. Sans dépendance, sans build.
 
 ## Essayer
 Ouvrir `index.html` dans un navigateur (double-clic suffit).
 
 ## Fonctionnement
-1. **Parc** : choisir un véhicule, cliquer sur un équipement du schéma (pastille verte = RAS, orange/rouge = défaut, numéro = gravité max).
-2. Choisir la **gravité** (1 mineure → 4 critique/immobilisant) et décrire les **symptômes**.
-3. Le signalement est enregistré dans l'**historique**, et un **mail prérempli** s'affiche (éditable) :
+1. **Parc** : choisir un véhicule (filtres agence / solution / type). Son **picto** s'affiche en grand avec deux zones cliquables
+   (**Cabine** / **Arrière**) ; chaque vue montre l'équipement sur une image avec des points cliquables
+   (vert = RAS, jaune à rouge foncé = défaut ouvert, numéro = gravité).
+2. Clic sur un équipement : **diagnostic guidé** (facultatif). On répond aux questions de l'arbre de causes jusqu'à une
+   *cause probable* + *action recommandée*, avec une gravité suggérée (modifiable) et le constat pré-rempli.
+3. Choix de la **gravité** (1 mineure → 4 critique), description des **symptômes**, chaise concernée (gauche / droite) si besoin.
+4. Le signalement est enregistré dans l'**historique** et un **mail prérempli** (diagnostic inclus) s'affiche, éditable :
    - *Ouvrir dans Outlook* : lien `mailto:` (texte tronqué si trop long, limite des liens Outlook) ;
-   - *Télécharger le brouillon (.eml)* : s'ouvre dans Outlook en brouillon (`X-Unsent: 1`), texte complet ;
+   - *Télécharger le brouillon (.eml)* : s'ouvre dans Outlook en brouillon (`X-Unsent: 1`), texte complet (recommandé) ;
    - *Copier*.
-4. **Historique** : filtres, changement de statut/gravité, journal, export CSV (Excel FR).
-5. **Réglages** : destinataire/copie par défaut, signature, sauvegarde/restauration JSON.
+5. **Historique** : filtres, changement de statut / gravité, journal, export CSV (Excel FR). **Réglages** : destinataire par défaut, signature, sauvegarde JSON.
 
-## Intégration dans l'outil global
+## Équipements pris en compte
+| Zone | Équipements | Solutions |
+|---|---|---|
+| Cabine | Antenne, calculateur K3, support de charge, tablette | toutes (CITIPAP, CITI'ID, CITI'Mission, CITIPAV) |
+| Arrière | Antenne (dent), décodeur, boîte à boutons, NBAB, câble | CITI'ID (les antennes / décodeurs / boîtes sont gérés par **chaise** gauche / droite) |
+
+## Arbres de causes
+`module/arbres.js` : bbv, lecteur (antenne / décodeur), nbab, tablette, support, k3, antenne cabine, câble. Source : *Guide pour Diagnostic et
+Maintenance CITI ID Simpliciti V2.2*. Les conclusions marquées « piste hors guide » (`piste: true`) sont des compléments à valider.
+Un arbre = des nœuds (question + options) ; une option mène à un autre nœud, un autre arbre, ou une conclusion (cause, action, gravité).
+
+## Données et intégration dans l'outil global
 ```html
 <link rel="stylesheet" href="module/materiel-embarque.css">
-<script src="module/data.js"></script><script src="module/store.js"></script>
-<script src="module/mail.js"></script><script src="module/schemas.js"></script><script src="module/app.js"></script>
+<script src="module/data.js"></script><script src="module/store.js"></script><script src="module/mail.js"></script>
+<script src="module/arbres.js"></script><script src="module/app.js"></script>
 <script>
   MaterielEmbarque.mount(document.getElementById('zone'), {
     vehicules: [...],        // optionnel : parc réel (même structure que module/data.js)
-    types: [...],            // optionnel : types de véhicules (schéma + équipements + position des points)
     reglages: { destinataire: 'atelier@...' },
     storage: { load() {...}, save(obj) {...} }   // optionnel : remplace localStorage (API, SharePoint...)
   });
 </script>
 ```
-Données par défaut (types, équipements, gravités, parc de démo) : `module/data.js`.
-
-## Types de véhicules
-Bennette (3,5 t), BOM mono-compartiment, BOM bi-compartiment, BOM bras latéral, camion grue. Chaque type a son schéma
-(`module/schemas.js`) et sa liste d'équipements (ex. caméra de bras / joystick pour le BL, limiteur de charge / radiocommande /
-calage stabilisateurs pour la grue). Un véhicule référence son `type` ; `equipements: [...]` (optionnel) limite aux équipements
-réellement montés. Ajouter un type = un schéma dans `schemas.js` + une entrée dans `types` de `data.js`.
+- `module/data.js` : solutions, types de véhicules (= pictos Paprec dans `module/img/pictos/`), vues, équipements, gravités, parc de démo.
+- Position d'un point sur une image : `pos: [x, y]` en pixels de l'image. **Maj + clic sur l'image** affiche les coordonnées à saisir.
+- Un véhicule peut limiter ses équipements : `equipements: ['tablette', 'k3']`.
+- Pictos : `module/img/pictos/*.svg` (bibliothèque PICTOS 2024). Images des vues : `module/img/vues/` (extraites du guide Simpliciti).
 
 ## Limites du MVP
 - Stockage local au navigateur par défaut (non partagé entre postes) → brancher `storage` pour un usage multi-utilisateurs.
-- Schémas simplifiés (pas à l'échelle) ; équipements et positions à valider avec vos réalités terrain.
-- Pas de pièce jointe/photo dans le mail (impossible via `mailto:`) ; possible dans le `.eml` en évolution.
+- Vue arrière = rendu d'une BOM mono 2 chaises (guide Simpliciti), utilisé pour tous les véhicules ; équipements arrière définis pour CITI'ID uniquement.
+- Position des points : cabine et arrière à valider / caler sur vos véhicules (K3, antenne et câble ne sont pas visibles : affichés en pastilles).
 - L'application ne peut pas savoir si le mail a été réellement envoyé : l'historique indique « mail préparé ».
