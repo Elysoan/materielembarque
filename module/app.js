@@ -329,8 +329,9 @@
         render(); toast('Parc importé : ' + res.vehicules.length + ' véhicules.');
       },
       modele: () => {
+        // options.modele() -> Promise<Blob> : l'hôte peut fournir le modèle autrement qu'en fichier .xlsx servi
         const url = base + 'modele-parc-vehicules.xlsx', nom = 'modele-parc-vehicules.xlsx';
-        fetch(url).then(r => { if (!r.ok) throw 0; return r.blob(); })
+        (opts.modele ? opts.modele() : fetch(url).then(r => { if (!r.ok) throw 0; return r.blob(); }))
           .then(b => save(nom, b, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
             () => { const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove(); });
       },
