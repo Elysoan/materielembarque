@@ -11,12 +11,13 @@
   const fmt = ME.mail.fmt;
   const localNow = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
-  function download(name, text, type) {
+  function linkDownload(name, text, type) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type }));
     a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return Promise.resolve();
   }
 
   function sevBadge(n) {
@@ -29,13 +30,24 @@
     const store = ME.createStore(opts);
     const state = { tab: 'parc', vehicleId: store.vehicules[0] && store.vehicules[0].id, vue: 'arriere', q: '', agence: '', type: '', solution: '', fStatut: 'ouvert', fSev: '', fQ: '' };
     const picto = name => base + 'img/pictos/' + name + '.svg';
+    // options.download(nom, texte, type) -> Promise : permet à l'outil hôte de fournir son propre enregistrement
+    const download = opts.download || linkDownload;
+    const emlOk = opts.eml !== false; // brouillon .eml (désactivable si l'hôte ne peut pas l'enregistrer)
+    let toastTimer = null;
+    const toast = msg => {
+      let t = el.querySelector('.me-toast');
+      if (!t) { t = document.createElement('div'); t.className = 'me-toast'; t.setAttribute('role', 'status'); el.appendChild(t); }
+      t.textContent = msg; t.hidden = false;
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+    };
+    const save = (name, text, type, ok) => download(name, text, type).then(() => ok && toast(ok), e => toast(e && e.code === 'declined' ? 'Enregistrement annulé.' : 'Enregistrement impossible ici.'));
 
     el.classList.add('me-root');
     el.innerHTML =
-      '<header class="me-head"><h2>Matériel embarqué</h2>' +
+      '<header class="me-head"><span class="me-logo">MATÉRIEL EMBARQUÉ</span><span class="me-sep">/</span><span class="me-sub">Parc, défauts et diagnostic</span><span class="me-spacer"></span>' +
       '<nav class="me-tabs" role="tablist">' +
       ['parc:Parc', 'histo:Historique', 'regl:Réglages'].map(t => { const p = t.split(':'); return '<button role="tab" data-action="tab" data-id="' + p[0] + '">' + p[1] + '</button>'; }).join('') +
-      '</nav></header><main class="me-view"></main><dialog class="me-dialog"></dialog>';
+      '</nav>' + (opts.version ? '<span class="me-pill">' + esc(opts.version) + '</span>' : '') + '</header><main class="me-view"></main><dialog class="me-dialog"></dialog>';
     const view = el.querySelector('.me-view');
     const dlg = el.querySelector('dialog');
 
@@ -67,7 +79,7 @@
       }).join('');
 
       return '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + base + cfg.img + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' + tray +
-        '<table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+        '<div class="me-scroll"><table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     /* ---------- Vues ---------- */
@@ -96,13 +108,13 @@
         const t = store.type(v.type), vues = Object.keys(store.vues);
         const zoneBtn = (vue, cls) => { const n = store.graviteVue(v, vue); return '<button class="me-zone ' + cls + ' me-s' + n + (state.vue === vue ? ' is-sel' : '') + '" data-action="vue" data-id="' + vue + '"><span>' + store.vues[vue].label + (n ? ' · ' + n : '') + '</span></button>'; };
         detail = '<div class="me-vhead"><h3>' + esc(v.parc) + ' <small>' + esc(v.immat) + '</small></h3><p>' + esc(t.label) + ' · ' + esc((store.solution(v.solution) || {}).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
-          '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
-          (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</figure>' +
+          '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><div class="me-picto-box"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
+          (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</div></figure>' +
           '<div class="me-vuetabs" role="tablist">' + vues.map(k => { const n = store.graviteVue(v, k); return '<button role="tab" class="me-vtab" aria-selected="' + (state.vue === k) + '" data-action="vue" data-id="' + k + '">' + store.vues[k].label + (n ? ' <span class="me-badge me-sev' + n + '">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>' +
           '<p class="me-hint">Cliquez sur un équipement pour signaler un défaut et lancer le diagnostic guidé.</p>' + vueHtml(v, state.vue);
       }
 
-      view.innerHTML = '<div class="me-parc"><aside><div class="me-filters">' +
+      view.innerHTML = '<div class="me-parc"><aside><p class="me-label">Parc · ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</p><div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
@@ -118,29 +130,29 @@
       });
       const rows = list.map(i => {
         const v = store.vehicule(i.vehiculeId) || {};
-        return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td>' + i.id + '</td><td>' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
+        return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td class="me-id">' + i.id + '</td><td class="me-num">' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
           '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
       }).join('');
       const opt = (arr, cur, all) => '<option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (String(a[0]) === String(cur) ? ' selected' : '') + '>' + a[1] + '</option>').join('');
-      view.innerHTML = '<div class="me-filters me-row">' +
-        '<input type="search" placeholder="Rechercher…" value="' + esc(state.fQ) + '" data-input="fQ">' +
-        '<select data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
-        '<select data-input="fSev">' + opt(D.gravites.map(g => [g.niveau, g.niveau + ' · ' + g.label]), state.fSev, 'Toutes gravités') + '</select>' +
+      view.innerHTML = '<div class="me-pad"><div class="me-row">' +
+        '<input type="search" style="flex:2;min-width:180px" placeholder="Rechercher…" value="' + esc(state.fQ) + '" data-input="fQ">' +
+        '<select style="flex:1;min-width:140px" data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
+        '<select style="flex:1;min-width:140px" data-input="fSev">' + opt(D.gravites.map(g => [g.niveau, g.niveau + ' · ' + g.label]), state.fSev, 'Toutes gravités') + '</select>' +
         '<span class="me-spacer"></span><button class="me-btn" data-action="csv">Export CSV</button></div>' +
-        '<table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Mail</th></tr></thead><tbody>' +
-        (rows || '<tr><td colspan="7" class="me-empty">Aucun signalement.</td></tr>') + '</tbody></table>';
+        '<div class="me-scroll"><table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Mail</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="7" class="me-empty">Aucun signalement pour ces filtres.</td></tr>') + '</tbody></table></div></div>';
     }
 
     function renderRegl() {
       const r = store.reglages();
       const f = (k, label, ph) => '<label>' + label + '<input name="' + k + '" value="' + esc(r[k]) + '" placeholder="' + esc(ph || '') + '"></label>';
-      view.innerHTML = '<form class="me-form" data-form="regl"><h3>Réglages du mail</h3>' +
+      view.innerHTML = '<div class="me-pad"><form class="me-form" data-form="regl"><h3>Réglages du mail</h3>' +
         f('destinataire', 'Destinataire(s) par défaut', 'atelier@exemple.fr ; maintenance@exemple.fr') + f('copie', 'Copie (Cc)') +
         f('declarant', 'Votre nom (signature)') + f('prefixeObjet', 'Préfixe de l\'objet') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
         '<h3>Données</h3><div class="me-actions"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
-        '<p class="me-hint">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form>';
+        '<p class="me-hint">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div>';
     }
 
     function render() {
@@ -231,9 +243,9 @@
         '<label>À<input name="to" value="' + esc(m.to) + '"></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
         '<label>Objet<input name="subject" value="' + esc(m.subject) + '"></label>' +
         '<label>Message<textarea name="body" rows="14">' + esc(m.body) + '</textarea></label>' +
-        '<p class="me-hint" data-note></p>' +
+        '<p class="me-hint" data-note>' + (emlOk ? '' : 'Si Outlook ne s\'ouvre pas, copiez le message et collez-le dans un nouveau mail.') + '</p>' +
         '<div class="me-actions"><button type="button" class="me-btn me-primary" data-action="outlook">Ouvrir dans Outlook</button>' +
-        '<button type="button" class="me-btn" data-action="eml">Télécharger le brouillon (.eml)</button>' +
+        (emlOk ? '<button type="button" class="me-btn" data-action="eml">Télécharger le brouillon (.eml)</button>' : '') +
         '<button type="button" class="me-btn" data-action="copy">Copier</button></div></form>');
     }
     const readMail = () => {
@@ -254,32 +266,34 @@
       'diag-answer': t => { ME.diag.answer(diag.st, +t.dataset.i); refreshDiag(); },
       'diag-back': () => { ME.diag.back(diag.st); refreshDiag(); },
       'diag-reset': () => { diag.st = null; refreshDiag(); },
-      csv: () => download('historique-materiel-embarque.csv', store.exportCSV(), 'text/csv;charset=utf-8'),
-      'json-out': () => download('materiel-embarque-sauvegarde.json', store.exportJSON(), 'application/json'),
+      csv: () => save('historique-materiel-embarque.csv', store.exportCSV(), 'text/csv;charset=utf-8', 'Historique exporté.'),
+      'json-out': () => save('materiel-embarque-sauvegarde.json', store.exportJSON(), 'application/json', 'Sauvegarde enregistrée.'),
       mail: t => mailDialog(t.dataset.id, false),
       outlook: () => {
         const m = readMail(), r = ME.mail.mailto(m);
         store.markMail(currentMail.id, 'Outlook');
         const a = document.createElement('a'); a.href = r.url; a.click();
-        note(r.truncated ? 'Message trop long pour un lien Outlook : il a été tronqué. Utilisez le .eml pour le texte complet.' : 'Outlook doit s\'ouvrir avec le message. Sinon, utilisez le .eml.');
+        note(r.truncated ? 'Message trop long pour un lien Outlook : il a été tronqué. ' + (emlOk ? 'Utilisez le .eml' : 'Utilisez « Copier »') + ' pour le texte complet.' : 'Outlook doit s\'ouvrir avec le message. Sinon, ' + (emlOk ? 'utilisez le .eml.' : 'utilisez « Copier ».'));
       },
       eml: () => {
         const m = readMail();
         store.markMail(currentMail.id, '.eml');
-        download(currentMail.id + '.eml', ME.mail.eml(m), 'message/rfc822');
-        note('Ouvrez le fichier téléchargé : Outlook l\'ouvre en brouillon, prêt à envoyer.');
+        save(currentMail.id + '.eml', ME.mail.eml(m), 'message/rfc822').then(() => note('Ouvrez le fichier téléchargé : Outlook l\'ouvre en brouillon, prêt à envoyer.'));
       },
       copy: () => {
         const m = readMail();
         const text = 'À : ' + m.to + '\nCc : ' + m.cc + '\nObjet : ' + m.subject + '\n\n' + m.body;
-        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => note('Copié.'), () => note('Copie impossible : sélectionnez le texte manuellement.'));
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => note('Copié : collez-le dans un nouveau mail.'), () => {
+          const b = dlg.querySelector('[name=body]'); b.focus(); b.select();
+          note('Copie automatique refusée : le message est sélectionné, faites Ctrl+C.');
+        });
       }
     };
 
     el.addEventListener('click', ev => {
       if (ev.shiftKey && ev.target.matches('.me-vue img')) { // aide au calage des points : Maj + clic sur l'image
         const r = ev.target.getBoundingClientRect(), cfg = store.vues[state.vue];
-        alert('pos: [' + Math.round((ev.clientX - r.left) / r.width * cfg.w) + ', ' + Math.round((ev.clientY - r.top) / r.height * cfg.h) + ']');
+        toast('pos: [' + Math.round((ev.clientX - r.left) / r.width * cfg.w) + ', ' + Math.round((ev.clientY - r.top) / r.height * cfg.h) + ']');
         return;
       }
       const t = ev.target.closest('[data-action]');
@@ -302,7 +316,7 @@
     el.addEventListener('change', ev => {
       if (ev.target.dataset.input !== 'json-in' || !ev.target.files[0]) return;
       const rd = new FileReader();
-      rd.onload = () => { try { store.importJSON(rd.result); alert('Sauvegarde restaurée.'); render(); } catch (e) { alert('Fichier invalide.'); } };
+      rd.onload = () => { try { store.importJSON(rd.result); render(); toast('Sauvegarde restaurée.'); } catch (e) { toast('Fichier invalide : choisissez une sauvegarde JSON de ce module.'); } };
       rd.readAsText(ev.target.files[0]);
     });
     el.addEventListener('submit', ev => {
@@ -310,7 +324,7 @@
       ev.preventDefault();
       if (kind === 'regl') {
         store.setReglages({ destinataire: f.destinataire.value.trim(), copie: f.copie.value.trim(), declarant: f.declarant.value.trim(), prefixeObjet: f.prefixeObjet.value.trim() });
-        render();
+        render(); toast('Réglages enregistrés.');
       } else if (kind === 'declare') {
         store.setReglages({ declarant: f.declarant.value.trim() });
         const inc = store.add({
@@ -328,7 +342,7 @@
         if (gravite !== i.gravite) parts.push('Gravité : ' + i.gravite + ' → ' + gravite);
         if (f.commentaire.value.trim()) parts.push(f.commentaire.value.trim());
         store.update(id, { statut, gravite }, parts.join(' · '));
-        dlg.close(); render();
+        dlg.close(); render(); toast(id + ' mis à jour.');
       }
     });
 
