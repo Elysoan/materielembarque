@@ -44,7 +44,7 @@
 
     el.classList.add('me-root');
     el.innerHTML =
-      '<header class="me-head"><span class="me-logo">MATÉRIEL EMBARQUÉ</span><span class="me-sep">/</span><span class="me-sub">Parc, défauts et diagnostic</span><span class="me-spacer"></span>' +
+      '<header class="me-head"><img class="me-logo" src="' + base + 'img/logo-paprec.svg" alt="Paprec"><h1 class="me-titre">Matériel embarqué</h1><span class="me-spacer"></span>' +
       '<nav class="me-tabs" role="tablist">' +
       ['parc:Parc', 'histo:Historique', 'regl:Réglages'].map(t => { const p = t.split(':'); return '<button role="tab" data-action="tab" data-id="' + p[0] + '">' + p[1] + '</button>'; }).join('') +
       '</nav>' + (opts.version ? '<span class="me-pill">' + esc(opts.version) + '</span>' : '') + '</header><main class="me-view"></main><dialog class="me-dialog"></dialog>';
@@ -111,10 +111,10 @@
           '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><div class="me-picto-box"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
           (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</div></figure>' +
           '<div class="me-vuetabs" role="tablist">' + vues.map(k => { const n = store.graviteVue(v, k); return '<button role="tab" class="me-vtab" aria-selected="' + (state.vue === k) + '" data-action="vue" data-id="' + k + '">' + store.vues[k].label + (n ? ' <span class="me-badge me-sev' + n + '">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>' +
-          '<p class="me-hint">Cliquez sur un équipement pour signaler un défaut et lancer le diagnostic guidé.</p>' + vueHtml(v, state.vue);
+          '<p class="me-hint">Cliquez sur un équipement : diagnostic guidé, niveau de gravité, puis mail prêt pour Outlook.</p>' + vueHtml(v, state.vue);
       }
 
-      view.innerHTML = '<div class="me-parc"><aside><p class="me-label">Parc · ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</p><div class="me-filters">' +
+      view.innerHTML = '<div class="me-parc"><aside><h2 class="me-label">Parc <small>· ' + list.length + ' véhicule' + (list.length > 1 ? 's' : '') + '</small></h2><div class="me-filters">' +
         '<input type="search" placeholder="Immat., n° de parc…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
@@ -133,8 +133,14 @@
         return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td class="me-id">' + i.id + '</td><td class="me-num">' + fmt(i.creeLe) + '</td><td>' + esc(v.parc) + '<br><small>' + esc(v.immat) + '</small></td>' +
           '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
       }).join('');
+      const all = store.incidents(), open = all.filter(i => i.statut !== 'resolu'), since = Date.now() - 30 * 864e5;
+      const kpi = (lib, val, c) => '<div class="me-kpi"' + (c ? ' style="--c:var(' + c + ')"' : '') + '><div class="lib">' + lib + '</div><div class="val">' + val + '</div></div>';
+      const kpis = '<div class="me-kpis">' + kpi('Défauts ouverts', open.length, open.length ? '--me-s2' : '--me-s0') +
+        kpi('Majeurs ou critiques', open.filter(i => i.gravite >= 3).length, open.some(i => i.gravite >= 3) ? '--me-s3' : '--me-s0') +
+        kpi('Véhicules concernés', new Set(open.map(i => i.vehiculeId)).size + ' / ' + store.vehicules.length) +
+        kpi('Résolus sur 30 jours', all.filter(i => i.resoluLe && Date.parse(i.resoluLe) >= since).length, '--me-s0') + '</div>';
       const opt = (arr, cur, all) => '<option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (String(a[0]) === String(cur) ? ' selected' : '') + '>' + a[1] + '</option>').join('');
-      view.innerHTML = '<div class="me-pad"><div class="me-row">' +
+      view.innerHTML = '<div class="me-pad"><h2 class="me-label">Historique des signalements</h2>' + kpis + '<div class="me-row">' +
         '<input type="search" style="flex:2;min-width:180px" placeholder="Rechercher…" value="' + esc(state.fQ) + '" data-input="fQ">' +
         '<select style="flex:1;min-width:140px" data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
         '<select style="flex:1;min-width:140px" data-input="fSev">' + opt(D.gravites.map(g => [g.niveau, g.niveau + ' · ' + g.label]), state.fSev, 'Toutes gravités') + '</select>' +
@@ -146,13 +152,13 @@
     function renderRegl() {
       const r = store.reglages();
       const f = (k, label, ph) => '<label>' + label + '<input name="' + k + '" value="' + esc(r[k]) + '" placeholder="' + esc(ph || '') + '"></label>';
-      view.innerHTML = '<div class="me-pad"><form class="me-form" data-form="regl"><h3>Réglages du mail</h3>' +
+      view.innerHTML = '<div class="me-pad"><form class="me-form" data-form="regl"><h2 class="me-label">Réglages du mail</h2>' +
         f('destinataire', 'Destinataire(s) par défaut', 'atelier@exemple.fr ; maintenance@exemple.fr') + f('copie', 'Copie (Cc)') +
         f('declarant', 'Votre nom (signature)') + f('prefixeObjet', 'Préfixe de l\'objet') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
-        '<h3>Données</h3><div class="me-actions"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
+        '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label></div>' +
-        '<p class="me-hint">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div>';
+        '<p class="me-info">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div>';
     }
 
     function render() {
@@ -161,6 +167,11 @@
     }
 
     /* ---------- Dialogues ---------- */
+    // Parcours du signalement : 1 Diagnostic → 2 Gravité et symptômes → 3 Mail
+    function etapes(n) {
+      return '<div class="me-etapes" data-etapes>' + ['Diagnostic', 'Gravité et symptômes', 'Mail'].map((t, i) =>
+        '<div class="me-etape' + (i + 1 < n ? ' fait' : i + 1 === n ? ' cours' : '') + '"><span class="n">' + (i + 1 < n ? '✓' : i + 1) + '</span>' + t + '</div>').join('') + '</div>';
+    }
     function openDlg(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); }
     const closeBtn = '<button type="button" class="me-x" data-action="close" aria-label="Fermer">×</button>';
 
@@ -191,6 +202,8 @@
     function refreshDiag() {
       const host = dlg.querySelector('[data-diag]');
       if (host) host.innerHTML = diagBlock();
+      const et = dlg.querySelector('[data-etapes]');
+      if (et) et.outerHTML = etapes(diag.st && diag.st.fin ? 2 : 1);
       const st = diag.st, f = dlg.querySelector('[data-form="declare"]');
       if (st && st.fin && f) { // applique la gravité suggérée et pré-remplit le constat
         const r = f.querySelector('input[name=gravite][value="' + st.fin.gravite + '"]'); if (r) r.checked = true;
@@ -207,7 +220,7 @@
       const chaise = e.cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
         '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + e.cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
       openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + (e.picto ? '<img class="me-ico-h" src="' + picto(e.picto) + '" alt="">' : '') + esc(e.label) + '</h3>' +
-        '<p class="me-sub">' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' + existing + chaise +
+        '<p class="me-sub">' + esc(v.parc) + ' · ' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + existing + chaise +
         (e.arbre ? '<section class="me-diag" data-diag>' + diagBlock() + '</section>' : '') +
         '<fieldset><legend>Niveau de gravité</legend>' + D.gravites.map(g =>
           '<label class="me-sevopt me-sev' + g.niveau + '"><input type="radio" name="gravite" value="' + g.niveau + '" required' + (g.niveau === 2 ? ' checked' : '') + '>' +
@@ -215,7 +228,7 @@
         '<label>Description des symptômes<textarea name="symptomes" rows="4" required placeholder="Que constate-t-on ? Depuis quand ? Intermittent ou permanent ? Voyant, message d\'erreur…"></textarea></label>' +
         '<div class="me-row"><label>Constaté le<input type="datetime-local" name="constateLe" value="' + localNow() + '" required></label>' +
         '<label>Signalé par<input name="declarant" value="' + esc(store.reglages().declarant) + '" required></label></div>' +
-        '<div class="me-actions"><button type="button" class="me-btn" data-action="close">Annuler</button><button class="me-btn me-primary">Enregistrer et préparer le mail</button></div></form>');
+        '<div class="me-actions"><button type="button" class="me-btn" data-action="close">Annuler</button><button class="me-btn me-vert">Enregistrer et préparer le mail</button></div></form>');
     }
 
     function incidentDialog(id) {
@@ -237,14 +250,14 @@
       const i = store.incident(id);
       currentMail = { id, m: ME.mail.build(store, i) };
       const m = currentMail.m;
-      openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>Mail prêt à envoyer</h3>' +
+      openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>Mail prêt à envoyer</h3>' + (fresh ? etapes(3) : '') +
         (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique.</p>' : '') +
         (m.to ? '' : '<p class="me-warn">Aucun destinataire par défaut : renseignez-le ici ou dans Réglages.</p>') +
         '<label>À<input name="to" value="' + esc(m.to) + '"></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
         '<label>Objet<input name="subject" value="' + esc(m.subject) + '"></label>' +
         '<label>Message<textarea name="body" rows="14">' + esc(m.body) + '</textarea></label>' +
         '<p class="me-hint" data-note>' + (emlOk ? '' : 'Si Outlook ne s\'ouvre pas, copiez le message et collez-le dans un nouveau mail.') + '</p>' +
-        '<div class="me-actions"><button type="button" class="me-btn me-primary" data-action="outlook">Ouvrir dans Outlook</button>' +
+        '<div class="me-actions"><button type="button" class="me-btn me-vert" data-action="outlook">Ouvrir dans Outlook</button>' +
         (emlOk ? '<button type="button" class="me-btn" data-action="eml">Télécharger le brouillon (.eml)</button>' : '') +
         '<button type="button" class="me-btn" data-action="copy">Copier</button></div></form>');
     }

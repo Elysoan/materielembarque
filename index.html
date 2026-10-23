@@ -5,13 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Matériel embarqué</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="module/materiel-embarque.css">
   <style>
-    :root { --page: #0f1218; color-scheme: dark; }
-    @media (prefers-color-scheme: light) { :root { --page: #e6eaf1; color-scheme: light; } }
-    body { margin: 0; background: var(--page); }
-    #app { max-width: 1440px; margin: 0 auto; min-height: 100vh; }
+    body { margin: 0; background: #F5F7FA; }
+    #app { min-height: 100vh; }
   </style>
 </head>
 <body>
@@ -21,6 +19,6 @@
   <script src="module/mail.js"></script>
   <script src="module/arbres.js"></script>
   <script src="module/app.js"></script>
-  <script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.1' });</script>
+  <script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.2' });</script>
 </body>
 </html>
