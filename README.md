@@ -28,7 +28,7 @@ niveau de gravité, historique, préparation du mail pour Outlook. Sans dépenda
 2. Remplir l'onglet « Parc » : une ligne par véhicule. Les équipements se remplissent **automatiquement selon la solution**
    (Oui / « — » si non applicable) ; remplacer par « Non » un équipement absent. Correspondance solution / équipements : onglet « Listes ».
 3. Glisser le fichier dans la zone de dépôt : l'outil affiche un rapport (véhicules prêts, erreurs ligne par ligne, avertissements),
-   puis **Remplacer le parc**. Les signalements suivent les véhicules par leur n° de parc d'un import à l'autre.
+   puis **Remplacer le parc**. Les signalements suivent les véhicules par leur immatriculation d'un import à l'autre.
 4. Mise à jour : **Exporter le parc actuel (CSV)**, modifier, réimporter. Excel (.xlsx) ou CSV acceptés ; lecture Excel par SheetJS
    embarqué (`module/vendor/`, Apache 2.0), sans accès internet.
 
