@@ -439,10 +439,10 @@
     // Équipements à cocher selon les solutions choisies (cochés par défaut, ou d'après le véhicule existant)
     function equipCases(sol, kit, coches) {
       const v = { solution: sol, complements: kit ? ['kitpieton'] : [] };
-      const parVue = {}; store.equipsPrevus(v).forEach(e => (parVue[e.vue] = parVue[e.vue] || []).push(e));
+      const parVue = {}; store.equipsPrevus(v).filter(e => e.vue !== 'pieton').forEach(e => (parVue[e.vue] = parVue[e.vue] || []).push(e));
       return Object.keys(parVue).map(vu => '<div class="me-eqgroupe"><b>' + esc(store.vues[vu].label) + '</b>' + parVue[vu].map(e =>
         '<label class="me-case"><input type="checkbox" name="eq" value="' + e.id + '"' + (!coches || coches.indexOf(e.id) >= 0 ? ' checked' : '') + '> ' + esc(e.label) + '</label>').join('') + '</div>').join('') ||
-        '<p class="me-hint">Choisissez une solution pour afficher ses équipements.</p>';
+        '<p class="me-hint">' + (sol === 'kitpieton' ? 'Kit piéton seul : pas d\'autre équipement.' : 'Choisissez une solution pour afficher ses équipements.') + '</p>';
     }
     function vehiculeDialog(id) {
       const v = id ? store.vehicule(id) : null, kit = !!(v && (v.complements || []).indexOf('kitpieton') >= 0);
@@ -455,7 +455,7 @@
         '<datalist id="me-agences">' + agences.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist>' +
         '<div class="me-row"><label>Solution *<select name="solution" required><option value="">Choisir…</option>' + opt(store.solutions.map(x => [x.id, x.label]), v ? v.solution : '') + '</select></label>' +
         '<label>Type de véhicule *<select name="type" required><option value="">Choisir…</option>' + opt(store.types.map(x => [x.id, x.label]), v ? v.type : '') + '</select></label></div>' +
-        '<label class="me-case me-kit"' + (v && v.solution === 'kitpieton' ? ' hidden' : '') + '><input type="checkbox" name="kit"' + (kit ? ' checked' : '') + '> <span><b>Kit piéton en complément</b><small>Smartphone lecteur de puces associé à ce véhicule</small></span></label>' +
+        '<label class="me-case me-kit"' + (v && v.solution === 'kitpieton' ? ' hidden' : '') + '><input type="checkbox" name="kit"' + (kit ? ' checked' : '') + '> <span><b>Kit piéton en complément</b><small>Kit de lecture des puces associé à ce véhicule</small></span></label>' +
         '<label>Marque / modèle<input name="modele" value="' + esc(v ? v.modele || '' : '') + '"></label>' +
         '<fieldset><legend>Équipements montés <small>(décochez ceux qui manquent)</small></legend><div data-eqcases>' +
           (v ? equipCases(v.solution, kit, store.equipsOf(v).map(e => e.id)) : equipCases('', false)) + '</div></fieldset>' +
@@ -652,7 +652,9 @@
         const v = { id: f.dataset.id || 'p-' + ME.parc.cle(immat), immat, agence: f.agence.value.trim(), solution: sol, type: f.type.value, modele: f.modele.value.trim() };
         if (kit) v.complements = ['kitpieton'];
         const ancien = f.dataset.id && store.vehicule(f.dataset.id); if (ancien && ancien.commentaire) v.commentaire = ancien.commentaire;
-        const prevus = store.equipsPrevus(v).map(e => e.id), coches = Array.from(f.querySelectorAll('[name=eq]:checked')).map(c => c.value);
+        const prevus = store.equipsPrevus(v).map(e => e.id);
+        const coches = Array.from(f.querySelectorAll('[name=eq]:checked')).map(c => c.value)
+          .concat(store.equipsPrevus(v).filter(e => e.vue === 'pieton').map(e => e.id)); // le kit est présent dès que la solution est cochée
         if (coches.length < prevus.length) v.equipements = prevus.filter(e => coches.indexOf(e) >= 0);
         store.saveVehicule(v);
         state.vehicleId = v.id; state.tab = 'parc'; dlg.close(); render();

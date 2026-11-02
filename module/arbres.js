@@ -193,17 +193,17 @@
     },
 
     kitpieton: {
-      titre: 'Kit piéton', source: 'Piste hors guide (pas de documentation Simpliciti fournie pour le kit piéton)', debut: 'q0',
+      // Les trois types de panne sont ceux de l'exploitation ; les actions proposées sont à valider avec Simpliciti.
+      titre: 'Kit piéton', source: 'Pannes types de l\'exploitation (actions à valider avec Simpliciti)', debut: 'q0',
       noeuds: {
-        q0: { q: 'Que constate-t-on sur le kit piéton ?', options: [
-          { r: 'Le smartphone ne s\'allume pas ou ne charge pas', fin: { cause: 'Batterie déchargée ou chargeur / câble défaillant.', action: 'Tester avec un autre chargeur et un autre câble ; si le smartphone ne charge toujours pas, le remplacer.', gravite: 2, piste: true } },
-          { r: 'Les puces des bacs ne sont pas lues', suite: 'k1' },
-          { r: 'Les lectures ne remontent pas (application, transmission)', fin: { cause: 'Pas de connexion réseau, ou application à resynchroniser.', action: 'Vérifier la couverture réseau, relancer l\'application puis le smartphone. Si le défaut persiste : ' + SIMPLICITI + '.', gravite: 2, contact: true, piste: true } },
-          { r: 'Écran, coque ou lecteur cassé', fin: { cause: 'Casse matérielle.', action: 'Demander le remplacement de l\'élément cassé.', gravite: 2, piste: true } }
+        q0: { q: 'Quelle panne constate-t-on sur le kit piéton ?', options: [
+          { r: 'Absence du listing des contrats ou des tournées', fin: { cause: 'Contrats ou tournées non chargés sur le kit (synchronisation ou paramétrage).', action: 'Vérifier la connexion réseau du kit puis relancer l\'application pour resynchroniser. Si le listing reste vide : ' + SIMPLICITI + ' (paramétrage des contrats / tournées).', gravite: 3, contact: true, piste: true } },
+          { r: 'Problème de charge', fin: { cause: 'Batterie, chargeur ou câble défaillant.', action: 'Tester avec un autre chargeur et un autre câble. Si le kit ne charge toujours pas, demander son remplacement.', gravite: 2, piste: true } },
+          { r: 'Ne lit pas les puces', suite: 'k1' }
         ] },
-        k1: { q: 'Présentez une autre puce (bac test connu pour être bon). Est-elle lue ?', options: [
-          { r: 'Oui', fin: { cause: 'Puce du bac défectueuse ou absente.', action: 'Signaler le bac pour remplacement de sa puce.', gravite: 1, piste: true } },
-          { r: 'Non', fin: { cause: 'Lecteur de puces en défaut ou mal appairé au smartphone.', action: 'Redémarrer le smartphone et vérifier l\'appairage du lecteur. Si le défaut persiste : ' + SIMPLICITI + '.', gravite: 2, contact: true, piste: true } }
+        k1: { q: 'Présentez un bac test dont la puce est connue pour être bonne. Sa puce est-elle lue ?', options: [
+          { r: 'Oui', fin: { cause: 'Puce du bac défectueuse ou absente : le kit fonctionne.', action: 'Signaler le bac pour remplacement de sa puce.', gravite: 1, piste: true } },
+          { r: 'Non', fin: { cause: 'Lecture de puces du kit en défaut.', action: 'Redémarrer le kit et réessayer. Si aucune puce n\'est lue : ' + SIMPLICITI + ' pour remplacement du kit.', gravite: 3, contact: true, piste: true } }
         ] }
       }
     },

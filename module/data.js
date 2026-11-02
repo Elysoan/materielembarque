@@ -63,10 +63,8 @@
       { id: 'nbab', code: 'NB',     label: 'NBAB (boîtier arrière)', vue: 'arriere', solutions: ['citiid'], pos: [525, 530], arbre: 'nbab' },
       { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, cotes: COTES, coteObligatoire: false, arbre: 'cable' },
 
-      // Kit piéton (équipements à valider : absents de la documentation fournie)
-      { id: 'kp_phone',    code: 'SP', label: 'Smartphone (kit piéton)',  vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton' },
-      { id: 'kp_lecteur',  code: 'LP', label: 'Lecteur de puces',         vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton', picto: 'lecteur-rfid' },
-      { id: 'kp_chargeur', code: 'CH', label: 'Chargeur / batterie',      vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton' }
+      // Kit piéton : un seul équipement (smartphone lecteur de puces), présent dès que le véhicule a la solution
+      { id: 'kp_kit', code: 'KP', label: 'Kit piéton', vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton', picto: 'lecteur-rfid' }
     ],
 
     gravites: [
@@ -90,7 +88,7 @@
       { id: 'v3', type: 'bom_bicomp_5050', solution: 'citiid', immat: 'GM120CD', agence: 'Lyon Est',  modele: 'Scania P280 26T bi-comp' },
       { id: 'v4', type: 'bom_bl',   solution: 'citimission', immat: 'GK901MN', agence: 'Villeurbanne', modele: 'Renault D Wide 26T + bras' },
       { id: 'v5', type: 'bom_26t',  solution: 'citipap',    immat: 'GP310EF', agence: 'Villeurbanne', modele: 'Volvo FE 26T',
-        complements: ['kitpieton'], equipements: ['tablette', 'support', 'k3', 'kp_phone', 'kp_lecteur', 'kp_chargeur'] },
+        complements: ['kitpieton'], equipements: ['tablette', 'support', 'k3', 'kp_kit'] },
       { id: 'v6', type: 'bennette', solution: 'citipap',    immat: 'FZ032RT', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
       { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
     ],

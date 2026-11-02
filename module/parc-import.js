@@ -23,8 +23,7 @@
     { champ: 'kit',         test: k => k === 'kitpieton' }
   ];
   const EQUIP = { tablette: 'tablette', supportdecharge: 'support', calculateurk3: 'k3', k3: 'k3', antennecabine: 'ant_cab',
-    antennearrieredent: 'ant_ar', antennearriere: 'ant_ar', decodeur: 'decodeur', boiteaboutonsbbv: 'bbv', boiteaboutons: 'bbv', bbv: 'bbv', nbab: 'nbab',
-    smartphone: 'kp_phone', smartphonekitpieton: 'kp_phone', lecteurdepuces: 'kp_lecteur', chargeurbatterie: 'kp_chargeur', chargeur: 'kp_chargeur' };
+    antennearrieredent: 'ant_ar', antennearriere: 'ant_ar', decodeur: 'decodeur', boiteaboutonsbbv: 'bbv', boiteaboutons: 'bbv', bbv: 'bbv', nbab: 'nbab' };
 
   function chargerSheetJS() {
     if (root.XLSX) return Promise.resolve(root.XLSX);
@@ -128,8 +127,7 @@
       Équipements : Oui = monté, Non = absent, — = ne s'applique pas à la solution (comme dans le modèle). */
   function exporterCSV(store) {
     const E = [['tablette', 'Tablette'], ['support', 'Support de charge'], ['k3', 'Calculateur K3'], ['ant_cab', 'Antenne cabine'],
-      ['ant_ar', 'Antenne arrière (dent)'], ['decodeur', 'Décodeur'], ['bbv', 'Boîte à boutons (BBV)'], ['nbab', 'NBAB'],
-      ['kp_phone', 'Smartphone'], ['kp_lecteur', 'Lecteur de puces'], ['kp_chargeur', 'Chargeur / batterie']];
+      ['ant_ar', 'Antenne arrière (dent)'], ['decodeur', 'Décodeur'], ['bbv', 'Boîte à boutons (BBV)'], ['nbab', 'NBAB']];
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const tete = ['Immatriculation', 'Agence', 'Solution', 'Kit piéton', 'Type de véhicule', 'Marque / modèle'].concat(E.map(e => e[1]), ['Commentaire']);
     const lignes = store.vehicules.map(v => {

@@ -45,7 +45,7 @@ L'historique est conservé ; un import ultérieur remplace le parc complet.
 |---|---|---|
 | Cabine | Antenne, calculateur K3, support de charge, tablette | toutes (CITIPAP, CITI'ID, CITI'Mission, CITIPAV) |
 | Arrière | Antenne (dent), décodeur, boîte à boutons, NBAB, câble | CITI'ID (les antennes / décodeurs / boîtes sont gérés par **chaise** gauche / droite) |
-| Kit piéton | Smartphone, lecteur de puces, chargeur / batterie (à valider : absents de la documentation fournie) | Kit piéton : solution seule ou **complément** d'une autre solution |
+| Kit piéton | Le kit (un seul équipement). Pannes types : absence du listing des contrats ou tournées, problème de charge, ne lit pas les puces | Kit piéton : solution seule ou **complément** d'une autre solution |
 
 ## Arbres de causes
 `module/arbres.js` : bbv, lecteur (antenne / décodeur), nbab, tablette, support, k3, antenne cabine, câble. Source : *Guide pour Diagnostic et
