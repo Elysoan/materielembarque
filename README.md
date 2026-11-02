@@ -35,11 +35,17 @@ niveau de gravité, historique, préparation du mail pour Outlook. Sans dépenda
 4. Mise à jour : **Exporter le parc actuel (CSV)**, modifier, réimporter. Excel (.xlsx) ou CSV acceptés ; lecture Excel par SheetJS
    embarqué (`module/vendor/`, Apache 2.0), sans accès internet.
 
+## Ajouter ou modifier un véhicule
+Page Parc : **« + Ajouter un véhicule »** (immatriculation, agence, solution, kit piéton, type, équipements cochés selon la solution)
+et **« ✎ Modifier »** sur la fiche d'un véhicule (changer la solution, ajouter le kit piéton, décocher un équipement absent, retirer le véhicule).
+L'historique est conservé ; un import ultérieur remplace le parc complet.
+
 ## Équipements pris en compte
 | Zone | Équipements | Solutions |
 |---|---|---|
 | Cabine | Antenne, calculateur K3, support de charge, tablette | toutes (CITIPAP, CITI'ID, CITI'Mission, CITIPAV) |
 | Arrière | Antenne (dent), décodeur, boîte à boutons, NBAB, câble | CITI'ID (les antennes / décodeurs / boîtes sont gérés par **chaise** gauche / droite) |
+| Kit piéton | Smartphone, lecteur de puces, chargeur / batterie (à valider : absents de la documentation fournie) | Kit piéton : solution seule ou **complément** d'une autre solution |
 
 ## Arbres de causes
 `module/arbres.js` : bbv, lecteur (antenne / décodeur), nbab, tablette, support, k3, antenne cabine, câble. Source : *Guide pour Diagnostic et

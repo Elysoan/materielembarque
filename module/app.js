@@ -58,21 +58,21 @@
     function vueHtml(v, vue) {
       const cfg = store.vues[vue], lignes = store.lignes(v, vue);
       if (!lignes.length) {
-        return '<p class="me-empty">Aucun équipement « ' + cfg.label.toLowerCase() + ' » défini pour la solution ' + esc((store.solution(v.solution) || {}).label) + ' (à compléter dans data.js).</p>';
+        return '<p class="me-empty">Aucun équipement « ' + cfg.label.toLowerCase() + ' » pour ce véhicule (' + esc(store.solutionsOf(v).map(s => (store.solution(s) || { label: s }).label).join(' + ')) + '). <a href="#" data-action="veh-modifier">Modifier le véhicule</a></p>';
       }
       const attrs = l => 'data-action="equip" data-id="' + l.eq.id + '"' + (l.cote ? ' data-cote="' + l.cote + '"' : '');
       const name = l => l.eq.label + (l.cote ? ' - ' + l.cote : '');
       const sev = l => store.graviteMax(v.id, l.eq.id, l.cote);
 
-      const spots = lignes.filter(l => !l.eq.hors).map(l => {
+      const spots = !cfg.img ? '' : lignes.filter(l => !l.eq.hors).map(l => {
         const p = l.cote ? l.eq.pos[l.cote] : l.eq.pos, n = sev(l);
         return '<button class="me-hot me-s' + n + '" style="left:' + (p[0] / cfg.w * 100).toFixed(2) + '%;top:' + (p[1] / cfg.h * 100).toFixed(2) + '%" ' + attrs(l) +
           ' title="' + esc(name(l) + (n ? ' - défaut gravité ' + n : ' - RAS')) + '" aria-label="' + esc(name(l) + (n ? ', défaut gravité ' + n : ', RAS')) + '">' +
           '<span class="me-pulse"></span><b>' + l.eq.code + (l.cote ? '<small>' + l.cote[0] + '</small>' : '') + '</b>' + (n ? '<i>' + n + '</i>' : '') + '</button>';
       }).join('');
 
-      const hors = lignes.filter(l => l.eq.hors);
-      const tray = hors.length ? '<div class="me-tray"><span>Non visibles sur l\'image :</span>' + hors.map(l =>
+      const hors = lignes.filter(l => l.eq.hors || !cfg.img);
+      const tray = hors.length ? '<div class="me-tray"><span>' + (cfg.img ? 'Non visibles sur l\'image :' : 'Équipements :') + '</span>' + hors.map(l =>
         '<button class="me-chip me-s' + sev(l) + '" ' + attrs(l) + '>' + esc(name(l)) + (sev(l) ? ' · ' + sev(l) : '') + '</button>').join('') + '</div>' : '';
 
       const rows = lignes.map(l => {
@@ -81,7 +81,7 @@
           '<td><button class="me-btn" ' + attrs(l) + '>' + (nb ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
       }).join('');
 
-      return '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + asset(cfg.img) + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' + tray +
+      return (cfg.img ? '<figure class="me-vue" style="aspect-ratio:' + cfg.w + '/' + cfg.h + '"><img src="' + asset(cfg.img) + '" alt="Vue ' + esc(cfg.label.toLowerCase()) + '" draggable="false">' + spots + '</figure>' : '') + tray +
         '<div class="me-scroll"><table class="me-table"><thead><tr><th></th><th>Équipement</th><th>État</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
@@ -89,7 +89,7 @@
     function guideEtapes() {
       const info = store.parcInfo(), inc = store.incidents();
       return [
-        { ok: store.vehicules.length > 0 && !info.demo, titre: 'Importer votre parc', aide: 'Téléchargez le modèle Excel, remplissez-le, déposez-le.', action: 'goto-import', bouton: 'Importer le parc' },
+        { ok: store.vehicules.length > 0 && !info.demo, titre: 'Importer votre parc', aide: 'Modèle Excel à remplir et déposer, ou ajout véhicule par véhicule.', action: 'goto-import', bouton: 'Importer le parc' },
         { ok: !!store.reglages().declarant, titre: 'Indiquer votre nom', aide: 'Il signe les mails envoyés à Simpliciti.', action: 'goto-nom', bouton: 'Renseigner' },
         { ok: inc.length > 0, titre: 'Signaler un premier défaut', aide: 'Choisissez un véhicule et cliquez sur l\'équipement en défaut.', action: 'guide-signaler', bouton: 'Me montrer' },
         { ok: inc.some(i => i.statut !== 'ouvert'), titre: 'Suivre la résolution', aide: 'Dans l\'Historique, passez le signalement « En cours » puis « Résolu ».', action: 'guide-suivi', bouton: 'Ouvrir l\'historique' }
@@ -171,7 +171,8 @@
     function renderParc() {
       if (!store.vehicules.length) { // premier lancement : pas encore de parc, on guide vers l'import
         view.innerHTML = '<div class="me-stack">' + propositionVisite() + '<div class="me-pad"><h2 class="me-label">Bienvenue dans le suivi du matériel embarqué</h2>' +
-          '<p class="me-sub">Aucun véhicule pour l\'instant. Importez votre parc pour afficher les véhicules et leurs équipements, puis signaler les défauts.</p>' + guideHtml() + '</div>' +
+          '<p class="me-sub">Aucun véhicule pour l\'instant. Importez votre parc pour afficher les véhicules et leurs équipements, puis signaler les défauts. ' +
+          'Quelques véhicules seulement ? <a href="#" data-action="veh-ajouter">Ajoutez-les un par un</a>.</p>' + guideHtml() + '</div>' +
           importHtml() + '</div>';
         return;
       }
@@ -179,7 +180,7 @@
       const sans = x => String(x).toLowerCase().replace(/[\s\-]+/g, ''); // « GH-148 » trouve GH148HB
       const q = sans(state.q);
       const list = store.vehicules.filter(v => (!state.agence || v.agence === state.agence) && (!state.type || v.type === state.type) &&
-        (!state.solution || v.solution === state.solution) && (!q || sans(v.immat + ' ' + v.modele + ' ' + v.agence).indexOf(q) >= 0));
+        (!state.solution || store.solutionsOf(v).indexOf(state.solution) >= 0) && (!q || sans(v.immat + ' ' + v.modele + ' ' + v.agence).indexOf(q) >= 0));
       if (!store.vehicule(state.vehicleId) && list.length) state.vehicleId = list[0].id;
       const v = store.vehicule(state.vehicleId);
       if (v && !store.lignes(v, state.vue).length) { // vue sans équipement pour cette solution : bascule sur une vue renseignée
@@ -192,15 +193,16 @@
         const n = store.ouverts(x.id).length, sev = store.graviteMax(x.id);
         return '<button class="me-card' + (x.id === state.vehicleId ? ' is-sel' : '') + '" data-action="vehicle" data-id="' + x.id + '">' +
           '<img class="me-picto-mini" src="' + picto((store.type(x.type) || {}).picto) + '" alt="">' +
-          '<strong>' + esc(x.immat) + '</strong><span>' + esc((store.type(x.type) || {}).label) + ' · ' + esc(x.agence) + '</span><span>' + esc((store.solution(x.solution) || {}).label) + '</span>' +
+          '<strong>' + esc(x.immat) + '</strong><span>' + esc((store.type(x.type) || {}).label) + ' · ' + esc(x.agence) + '</span><span>' + esc(store.solutionsOf(x).map(s => (store.solution(s) || { label: s }).label).join(' + ')) + '</span>' +
           (n ? '<span class="me-badge me-sev' + sev + '">' + n + ' défaut' + (n > 1 ? 's' : '') + ' · max ' + sev + '</span>' : '<span class="me-badge me-sev0">RAS</span>') + '</button>';
       }).join('') || '<p class="me-empty">Aucun véhicule.</p>';
 
       let detail = '<p class="me-empty">Sélectionnez un véhicule.</p>';
       if (v) {
-        const t = store.type(v.type), vues = Object.keys(store.vues);
+        const t = store.type(v.type), vues = Object.keys(store.vues).filter(k => store.lignes(v, k).length || k === state.vue);
         const zoneBtn = (vue, cls) => { const n = store.graviteVue(v, vue); return '<button class="me-zone ' + cls + ' me-s' + n + (state.vue === vue ? ' is-sel' : '') + '" data-action="vue" data-id="' + vue + '"><span>' + store.vues[vue].label + (n ? ' · ' + n : '') + '</span></button>'; };
-        detail = '<div class="me-vhead"><h3>' + esc(v.immat) + '</h3><p>' + esc(t.label) + ' · ' + esc((store.solution(v.solution) || {}).label) + ' · ' + esc(v.modele) + ' · ' + esc(v.agence) + '</p></div>' +
+        detail = '<div class="me-vhead"><div><h3>' + esc(v.immat) + '</h3><p>' + [t.label, store.solutionsOf(v).map(s => (store.solution(s) || { label: s }).label).join(' + '), v.modele, v.agence].filter(Boolean).map(esc).join(' · ') + '</p></div>' +
+          '<button type="button" class="me-btn" data-action="veh-modifier">✎ Modifier</button></div>' +
           '<figure class="me-picto' + (t.zones ? ' has-zones' : '') + '"><div class="me-picto-box"><img src="' + picto(t.picto) + '" alt="' + esc(t.label) + '">' +
           (t.zones ? zoneBtn('arriere', 'me-zone-ar') + zoneBtn('cabine', 'me-zone-cab') : '') + '</div></figure>' +
           '<div class="me-vuetabs" role="tablist">' + vues.map(k => { const n = store.graviteVue(v, k); return '<button role="tab" class="me-vtab" aria-selected="' + (state.vue === k) + '" data-action="vue" data-id="' + k + '">' + store.vues[k].label + (n ? ' <span class="me-badge me-sev' + n + '">' + n + '</span>' : '') + '</button>'; }).join('') + '</div>' +
@@ -212,6 +214,7 @@
         '<div class="me-filters">' +
         '<input type="search" placeholder="Immatriculation, modèle…" value="' + esc(state.q) + '" data-input="q">' +
         sel('agence', agences.map(a => [a, a]), 'Toutes agences') + sel('solution', store.solutions.map(s => [s.id, s.label]), 'Toutes solutions') + sel('type', store.types.map(t => [t.id, t.label]), 'Tous types') + '</div>' +
+        '<button type="button" class="me-btn me-ajout" data-action="veh-ajouter">+ Ajouter un véhicule</button>' +
         '<div class="me-cards">' + cards + '</div></aside><section>' + detail + '</section></div>';
     }
 
@@ -433,6 +436,36 @@
         '<div class="me-actions"><button type="button" class="me-btn" data-action="close">Annuler</button><button class="me-btn me-vert">Enregistrer et préparer le mail</button></div></form>');
     }
 
+    // Équipements à cocher selon les solutions choisies (cochés par défaut, ou d'après le véhicule existant)
+    function equipCases(sol, kit, coches) {
+      const v = { solution: sol, complements: kit ? ['kitpieton'] : [] };
+      const parVue = {}; store.equipsPrevus(v).forEach(e => (parVue[e.vue] = parVue[e.vue] || []).push(e));
+      return Object.keys(parVue).map(vu => '<div class="me-eqgroupe"><b>' + esc(store.vues[vu].label) + '</b>' + parVue[vu].map(e =>
+        '<label class="me-case"><input type="checkbox" name="eq" value="' + e.id + '"' + (!coches || coches.indexOf(e.id) >= 0 ? ' checked' : '') + '> ' + esc(e.label) + '</label>').join('') + '</div>').join('') ||
+        '<p class="me-hint">Choisissez une solution pour afficher ses équipements.</p>';
+    }
+    function vehiculeDialog(id) {
+      const v = id ? store.vehicule(id) : null, kit = !!(v && (v.complements || []).indexOf('kitpieton') >= 0);
+      const agences = Array.from(new Set(store.vehicules.map(x => x.agence).filter(Boolean))).sort();
+      const opt = (arr, cur) => arr.map(a => '<option value="' + a[0] + '"' + (a[0] === cur ? ' selected' : '') + '>' + esc(a[1]) + '</option>').join('');
+      openDlg(closeBtn + '<form class="me-form" data-form="vehicule"' + (v ? ' data-id="' + v.id + '"' : '') + '><h3>' + (v ? 'Modifier ' + esc(v.immat) : 'Ajouter un véhicule') + '</h3>' +
+        '<p class="me-sub">' + (v ? 'L\'historique de ce véhicule est conservé.' : 'Le véhicule rejoint le parc ; vous pourrez le modifier ensuite.') + '</p>' +
+        '<div class="me-row"><label>Immatriculation *<input name="immat" required value="' + esc(v ? v.immat : '') + '" placeholder="GH148HB" autocomplete="off"></label>' +
+        '<label>Agence *<input name="agence" required list="me-agences" value="' + esc(v ? v.agence : '') + '"></label></div>' +
+        '<datalist id="me-agences">' + agences.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist>' +
+        '<div class="me-row"><label>Solution *<select name="solution" required><option value="">Choisir…</option>' + opt(store.solutions.map(x => [x.id, x.label]), v ? v.solution : '') + '</select></label>' +
+        '<label>Type de véhicule *<select name="type" required><option value="">Choisir…</option>' + opt(store.types.map(x => [x.id, x.label]), v ? v.type : '') + '</select></label></div>' +
+        '<label class="me-case me-kit"' + (v && v.solution === 'kitpieton' ? ' hidden' : '') + '><input type="checkbox" name="kit"' + (kit ? ' checked' : '') + '> <span><b>Kit piéton en complément</b><small>Smartphone lecteur de puces associé à ce véhicule</small></span></label>' +
+        '<label>Marque / modèle<input name="modele" value="' + esc(v ? v.modele || '' : '') + '"></label>' +
+        '<fieldset><legend>Équipements montés <small>(décochez ceux qui manquent)</small></legend><div data-eqcases>' +
+          (v ? equipCases(v.solution, kit, store.equipsOf(v).map(e => e.id)) : equipCases('', false)) + '</div></fieldset>' +
+        '<p class="me-warn" data-erreur hidden></p>' +
+        (v ? '<div data-suppr></div>' : '') +
+        '<div class="me-actions">' + (v ? '<button type="button" class="me-btn me-danger" data-action="veh-supprimer-ask" style="margin-right:auto">Supprimer</button>' : '') +
+        '<button type="button" class="me-btn" data-action="close">Annuler</button><button class="me-btn me-vert">' + (v ? 'Enregistrer' : 'Ajouter au parc') + '</button></div></form>');
+      if (!v) dlg.querySelector('[name=immat]').focus();
+    }
+
     function incidentDialog(id) {
       const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, d = i.diagnostic;
       openDlg(closeBtn + '<form class="me-form" data-form="update" data-id="' + id + '"><h3>' + id + ' <small>' + sevBadge(i.gravite) + '</small></h3>' +
@@ -493,6 +526,18 @@
       'diag-answer': t => { ME.diag.answer(diag.st, +t.dataset.i); refreshDiag(); },
       'diag-back': () => { ME.diag.back(diag.st); refreshDiag(); },
       'diag-reset': () => { diag.st = null; refreshDiag(); },
+      'veh-ajouter': () => vehiculeDialog(null),
+      'veh-modifier': () => vehiculeDialog(state.vehicleId),
+      'veh-supprimer-ask': () => {
+        const f = dlg.querySelector('[data-form=vehicule]'), v = store.vehicule(f.dataset.id), n = store.incidents().filter(i => i.vehiculeId === v.id).length;
+        dlg.querySelector('[data-suppr]').innerHTML = '<div class="me-warn">Retirer <b>' + esc(v.immat) + '</b> du parc ?' + (n ? ' Ses ' + n + ' signalement(s) restent dans l\'historique.' : '') +
+          '<div class="me-actions"><button type="button" class="me-btn" data-action="veh-supprimer-non">Annuler</button><button type="button" class="me-btn me-danger-plein" data-action="veh-supprimer-ok">Oui, retirer</button></div></div>';
+      },
+      'veh-supprimer-non': () => { dlg.querySelector('[data-suppr]').innerHTML = ''; },
+      'veh-supprimer-ok': () => {
+        const id = dlg.querySelector('[data-form=vehicule]').dataset.id, v = store.vehicule(id);
+        store.removeVehicule(id); dlg.close(); render(); toast(v.immat + ' retiré du parc.');
+      },
       'reset-ask': () => { state.resetAsk = true; render(); },
       'reset-non': () => { state.resetAsk = false; render(); },
       'reset-ok': () => { store.reset(); state.resetAsk = false; state.importRes = null; render(); toast('Données effacées : l\'outil repart de zéro.'); },
@@ -566,6 +611,17 @@
       if (ev.target.type === 'search') { const n = el.querySelector('[data-input="' + k + '"]'); n.focus(); n.setSelectionRange(pos, pos); }
     });
     el.addEventListener('change', ev => {
+      const fv = ev.target.form && ev.target.form.dataset.form === 'vehicule' ? ev.target.form : null;
+      if (fv && (ev.target.name === 'solution' || ev.target.name === 'kit')) {
+        // garde en mémoire les équipements décochés, même s'ils disparaissent le temps d'un changement de solution
+        const cases = Array.from(fv.querySelectorAll('[name=eq]')), visibles = cases.map(c => c.value);
+        const decoches = fv._decoches = (fv._decoches || []).filter(x => visibles.indexOf(x) < 0).concat(cases.filter(c => !c.checked).map(c => c.value));
+        const sol = fv.solution.value, kit = sol !== 'kitpieton' && fv.kit.checked;
+        fv.querySelector('.me-kit').hidden = sol === 'kitpieton';
+        const v = { solution: sol, complements: kit ? ['kitpieton'] : [] };
+        fv.querySelector('[data-eqcases]').innerHTML = equipCases(sol, kit, store.equipsPrevus(v).map(e => e.id).filter(e => decoches.indexOf(e) < 0));
+        return;
+      }
       if (ev.target.dataset.input === 'parc-in') { importer(ev.target.files[0]); ev.target.value = ''; return; }
       if (ev.target.dataset.input !== 'json-in' || !ev.target.files[0]) return;
       const rd = new FileReader();
@@ -588,6 +644,19 @@
         diag = { st: null, auto: '' };
         render();
         mailDialog(inc.id, true);
+      } else if (kind === 'vehicule') {
+        const immat = ME.parc.immat(f.immat.value), err = f.querySelector('[data-erreur]');
+        const doublon = store.vehicules.find(x => ME.parc.cle(x.immat) === ME.parc.cle(immat) && x.id !== f.dataset.id);
+        if (doublon) { err.textContent = 'L\'immatriculation ' + immat + ' existe déjà dans le parc.'; err.hidden = false; f.immat.focus(); return; }
+        const sol = f.solution.value, kit = sol !== 'kitpieton' && f.kit.checked;
+        const v = { id: f.dataset.id || 'p-' + ME.parc.cle(immat), immat, agence: f.agence.value.trim(), solution: sol, type: f.type.value, modele: f.modele.value.trim() };
+        if (kit) v.complements = ['kitpieton'];
+        const ancien = f.dataset.id && store.vehicule(f.dataset.id); if (ancien && ancien.commentaire) v.commentaire = ancien.commentaire;
+        const prevus = store.equipsPrevus(v).map(e => e.id), coches = Array.from(f.querySelectorAll('[name=eq]:checked')).map(c => c.value);
+        if (coches.length < prevus.length) v.equipements = prevus.filter(e => coches.indexOf(e) >= 0);
+        store.saveVehicule(v);
+        state.vehicleId = v.id; state.tab = 'parc'; dlg.close(); render();
+        toast(f.dataset.id ? v.immat + ' modifié.' : v.immat + ' ajouté au parc.' + (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(immat) ? '' : ' (immatriculation hors format AA123AA)'));
       } else if (kind === 'update') {
         const id = f.dataset.id, i = store.incident(id), parts = [];
         const statut = f.statut.value, gravite = +f.gravite.value;

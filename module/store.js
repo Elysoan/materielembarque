@@ -49,17 +49,39 @@
       copieFixe: opts.copie != null ? opts.copie : D.mail.copie, // toujours en copie, en plus des copies des Réglages
       /** Parc courant : le parc importé s'il existe, sinon celui fourni à mount() (ou la démonstration). */
       get vehicules() { return data.parc ? data.parc.vehicules : vehiculesDefaut; },
-      parcInfo: () => data.parc ? { fichier: data.parc.fichier, importeLe: data.parc.importeLe, demo: false } : { demo: !opts.vehicules },
+      parcInfo: () => data.parc ? { fichier: data.parc.fichier, importeLe: data.parc.importeLe, modifieLe: data.parc.modifieLe, demo: false } : { demo: !opts.vehicules },
       setParc(list, fichier) { data.parc = { vehicules: list, fichier: fichier || '', importeLe: now() }; persist(); },
       vehicule: id => api.vehicules.find(v => v.id === id),
       type: id => types.find(t => t.id === id),
       solution: id => solutions.find(s => s.id === id),
       equipement: id => equipements.find(e => e.id === id),
 
-      /** Équipements montés sur un véhicule : ceux de sa solution, limités à `v.equipements` si renseigné. */
+      /** Solutions d'un véhicule : la principale, puis les complémentaires (ex. kit piéton). */
+      solutionsOf: v => [v.solution].concat(v.complements || []).filter((s, i, a) => s && a.indexOf(s) === i),
+      /** Équipements prévus pour ces solutions (sans tenir compte des absences). */
+      equipsPrevus(v) {
+        const sols = api.solutionsOf(v);
+        return equipements.filter(e => !e.solutions || e.solutions.some(s => sols.indexOf(s) >= 0));
+      },
+      /** Équipements montés sur un véhicule : ceux de ses solutions, limités à `v.equipements` si renseigné. */
       equipsOf(v) {
-        return equipements.filter(e => (!e.solutions || e.solutions.indexOf(v.solution) >= 0) &&
-          (!v.equipements || v.equipements.indexOf(e.id) >= 0));
+        return api.equipsPrevus(v).filter(e => !v.equipements || v.equipements.indexOf(e.id) >= 0);
+      },
+      /** Solution à laquelle se rattache un équipement de ce véhicule (préfixe de l'objet du mail). */
+      solutionDe(v, equipId) {
+        const e = api.equipement(equipId), sols = api.solutionsOf(v);
+        return (e && e.solutions && sols.find(s => e.solutions.indexOf(s) >= 0)) || v.solution;
+      },
+      /** Ajoute ou remplace un véhicule (même id) dans le parc enregistré. */
+      saveVehicule(v) {
+        const list = api.vehicules.slice(), i = list.findIndex(x => x.id === v.id);
+        if (i >= 0) list[i] = v; else list.push(v);
+        data.parc = Object.assign({ fichier: '', importeLe: null }, data.parc || {}, { vehicules: list, modifieLe: now() });
+        persist();
+      },
+      removeVehicule(id) {
+        data.parc = Object.assign({ fichier: '', importeLe: null }, data.parc || {}, { vehicules: api.vehicules.filter(x => x.id !== id), modifieLe: now() });
+        persist();
       },
       /** Lignes (équipement + chaise éventuelle) d'une vue : un équipement parCote donne une ligne par chaise. */
       lignes(v, vue) {
@@ -84,7 +106,7 @@
       graviteMax(vehiculeId, equipId, cote) {
         return api.ouverts(vehiculeId, equipId, cote).reduce((m, i) => Math.max(m, i.gravite), 0);
       },
-      graviteVue(v, vue) {
+      graviteVue(v, vue) { // gravité max des défauts ouverts sur les équipements de cette vue
         const ids = api.equipsOf(v).filter(e => e.vue === vue).map(e => e.id);
         return data.incidents.filter(i => i.statut !== 'resolu' && i.vehiculeId === v.id && ids.indexOf(i.equipId) >= 0)
           .reduce((m, i) => Math.max(m, i.gravite), 0);

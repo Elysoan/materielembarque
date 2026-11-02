@@ -19,10 +19,12 @@
     { champ: 'solution',    test: k => k === 'solution' },
     { champ: 'type',        test: k => k.indexOf('type') === 0 },
     { champ: 'modele',      test: k => k.indexOf('marque') >= 0 || k.indexOf('modele') >= 0 },
-    { champ: 'commentaire', test: k => k.indexOf('commentaire') === 0 }
+    { champ: 'commentaire', test: k => k.indexOf('commentaire') === 0 },
+    { champ: 'kit',         test: k => k === 'kitpieton' }
   ];
   const EQUIP = { tablette: 'tablette', supportdecharge: 'support', calculateurk3: 'k3', k3: 'k3', antennecabine: 'ant_cab',
-    antennearrieredent: 'ant_ar', antennearriere: 'ant_ar', decodeur: 'decodeur', boiteaboutonsbbv: 'bbv', boiteaboutons: 'bbv', bbv: 'bbv', nbab: 'nbab' };
+    antennearrieredent: 'ant_ar', antennearriere: 'ant_ar', decodeur: 'decodeur', boiteaboutonsbbv: 'bbv', boiteaboutons: 'bbv', bbv: 'bbv', nbab: 'nbab',
+    smartphone: 'kp_phone', smartphonekitpieton: 'kp_phone', lecteurdepuces: 'kp_lecteur', chargeurbatterie: 'kp_chargeur', chargeur: 'kp_chargeur' };
 
   function chargerSheetJS() {
     if (root.XLSX) return Promise.resolve(root.XLSX);
@@ -107,11 +109,13 @@
 
       // Identifiant stable : dérivé de l'immatriculation, pour que l'historique suive le véhicule d'un import à l'autre
       const v = { id: 'p-' + cle(immat), type, solution, immat, agence: val('agence'), modele: val('modele') };
+      if (solution !== 'kitpieton' && cle(val('kit')) === 'oui') v.complements = ['kitpieton']; // kit piéton en complément
+      const prevus = store.equipsPrevus(v).map(e => e.id);
       const absents = Object.keys(colEquip).filter(e => cle(l[colEquip[e]]) === 'non');
       if (absents.length) {
-        v.equipements = store.equipsOf({ solution }).map(e => e.id).filter(e => absents.indexOf(e) < 0);
-        const horsSolution = absents.filter(e => !store.equipsOf({ solution }).some(x => x.id === e));
-        if (horsSolution.length) avertissements.push({ ligne: n, texte: '« Non » ignoré pour ' + horsSolution.map(e => (store.equipement(e) || { label: e }).label).join(', ') + ' : équipement non prévu pour ' + val('solution') + '.' });
+        v.equipements = prevus.filter(e => absents.indexOf(e) < 0);
+        const horsSolution = absents.filter(e => prevus.indexOf(e) < 0);
+        if (horsSolution.length) avertissements.push({ ligne: n, texte: '« Non » ignoré pour ' + horsSolution.map(e => (store.equipement(e) || { label: e }).label).join(', ') + ' : équipement non prévu pour ' + val('solution') + (v.complements ? ' + kit piéton' : '') + '.' });
       }
       if (val('commentaire')) v.commentaire = val('commentaire');
       vehicules.push(v);
@@ -124,16 +128,17 @@
       Équipements : Oui = monté, Non = absent, — = ne s'applique pas à la solution (comme dans le modèle). */
   function exporterCSV(store) {
     const E = [['tablette', 'Tablette'], ['support', 'Support de charge'], ['k3', 'Calculateur K3'], ['ant_cab', 'Antenne cabine'],
-      ['ant_ar', 'Antenne arrière (dent)'], ['decodeur', 'Décodeur'], ['bbv', 'Boîte à boutons (BBV)'], ['nbab', 'NBAB']];
+      ['ant_ar', 'Antenne arrière (dent)'], ['decodeur', 'Décodeur'], ['bbv', 'Boîte à boutons (BBV)'], ['nbab', 'NBAB'],
+      ['kp_phone', 'Smartphone'], ['kp_lecteur', 'Lecteur de puces'], ['kp_chargeur', 'Chargeur / batterie']];
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const tete = ['Immatriculation', 'Agence', 'Solution', 'Type de véhicule', 'Marque / modèle'].concat(E.map(e => e[1]), ['Commentaire']);
+    const tete = ['Immatriculation', 'Agence', 'Solution', 'Kit piéton', 'Type de véhicule', 'Marque / modèle'].concat(E.map(e => e[1]), ['Commentaire']);
     const lignes = store.vehicules.map(v => {
-      const prevus = store.equipsOf({ solution: v.solution }).map(e => e.id), montes = store.equipsOf(v).map(e => e.id);
-      return [v.immat, v.agence, (store.solution(v.solution) || {}).label, (store.type(v.type) || {}).label, v.modele]
+      const prevus = store.equipsPrevus(v).map(e => e.id), montes = store.equipsOf(v).map(e => e.id);
+      return [v.immat, v.agence, (store.solution(v.solution) || {}).label, (v.complements || []).indexOf('kitpieton') >= 0 ? 'Oui' : '', (store.type(v.type) || {}).label, v.modele]
         .concat(E.map(e => prevus.indexOf(e[0]) < 0 ? '—' : montes.indexOf(e[0]) < 0 ? 'Non' : 'Oui'), [v.commentaire]).map(q).join(';');
     });
     return '﻿' + tete.map(q).join(';') + '\r\n' + lignes.join('\r\n');
   }
 
-  ME.parc = { lireFichier, lireCSV, analyse, exporterCSV };
+  ME.parc = { lireFichier, lireCSV, analyse, exporterCSV, immat: immatNormalisee, cle };
 })(window);

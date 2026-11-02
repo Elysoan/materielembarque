@@ -19,7 +19,7 @@
   function build(store, inc) {
     const v = store.vehicule(inc.vehiculeId) || {};
     const t = store.type(v.type) || {};
-    const sol = store.solution(v.solution) || {};
+    const sol = store.solution(store.solutionDe(v, inc.equipId)) || {}; // solution de l'équipement en défaut
     const equipLabel = store.libelle(inc);
     const g = ME.defaults.gravites.find(x => x.niveau === inc.gravite) || {};
     const r = store.reglages();
@@ -38,7 +38,7 @@
       '- Immatriculation : ' + v.immat,
       '- Agence : ' + v.agence,
       '- Type : ' + t.label + (v.modele ? ' (' + v.modele + ')' : ''),
-      '- Solution : ' + sol.label,
+      '- Solution : ' + store.solutionsOf(v).map(s => (store.solution(s) || { label: s }).label).join(' + '),
       '',
       'ÉQUIPEMENT EN DÉFAUT',
       '- Équipement : ' + equipLabel,

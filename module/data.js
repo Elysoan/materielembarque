@@ -4,13 +4,16 @@
   const ME = (root.MaterielEmbarque = root.MaterielEmbarque || {});
 
   const COTES = ['Gauche', 'Droite'];
+  const EMBARQUE = ['citipap', 'citiid', 'citimission', 'citipav']; // solutions embarquées (cabine équipée)
 
   ME.defaults = {
     solutions: [
       { id: 'citipap',    label: 'CITIPAP' },
       { id: 'citiid',     label: "CITI'ID" },
       { id: 'citimission', label: "CITI'Mission" },
-      { id: 'citipav',    label: 'CITIPAV' }
+      { id: 'citipav',    label: 'CITIPAV' },
+      // Solution complémentaire : smartphone lecteur de puces, ajoutable à un véhicule en plus de sa solution principale
+      { id: 'kitpieton',  label: 'Kit piéton', complement: true }
     ],
 
     // Type de véhicule = picto (module/img/pictos/<picto>.svg). `zones` : vue de profil, cabine à droite
@@ -34,7 +37,8 @@
     // Vues détaillées (image + dimensions pour positionner les points en pixels de l'image).
     vues: {
       cabine:  { label: 'Cabine',  img: 'img/vues/cabine.jpg',  w: 1343, h: 820 },
-      arriere: { label: 'Arrière', img: 'img/vues/arriere.jpg', w: 782,  h: 878 }
+      arriere: { label: 'Arrière', img: 'img/vues/arriere.jpg', w: 782,  h: 878 },
+      pieton:  { label: 'Kit piéton' } // pas d'image : équipements listés
     },
 
     // Équipements pris en compte (guide Simpliciti CITI'ID).
@@ -45,10 +49,10 @@
     //  parCote  : un point (et une ligne) par chaise ; cotes/coteObligatoire pilotent le champ « Chaise »
     //  arbre    : arbre de diagnostic (arbres.js) ; picto : icône (module/img/pictos)
     equipements: [
-      { id: 'tablette', code: 'TA', label: 'Tablette',                    vue: 'cabine', pos: [670, 205], arbre: 'tablette', picto: 'ordinateur-de-bord' },
-      { id: 'support', code: 'SC',  label: 'Support de charge (tablette)', vue: 'cabine', pos: [665, 352], arbre: 'support' },
-      { id: 'k3', code: 'K3',       label: 'Calculateur K3',               vue: 'cabine', hors: true, arbre: 'k3', picto: 'solution-embarquee-gps' },
-      { id: 'ant_cab', code: 'AN',  label: 'Antenne (cabine)',             vue: 'cabine', hors: true, arbre: 'antenne_cab' },
+      { id: 'tablette', code: 'TA', label: 'Tablette',                    vue: 'cabine', solutions: EMBARQUE, pos: [670, 205], arbre: 'tablette', picto: 'ordinateur-de-bord' },
+      { id: 'support', code: 'SC',  label: 'Support de charge (tablette)', vue: 'cabine', solutions: EMBARQUE, pos: [665, 352], arbre: 'support' },
+      { id: 'k3', code: 'K3',       label: 'Calculateur K3',               vue: 'cabine', solutions: EMBARQUE, hors: true, arbre: 'k3', picto: 'solution-embarquee-gps' },
+      { id: 'ant_cab', code: 'AN',  label: 'Antenne (cabine)',             vue: 'cabine', solutions: EMBARQUE, hors: true, arbre: 'antenne_cab' },
 
       { id: 'ant_ar', code: 'AN',   label: 'Antenne (dent antenne)', vue: 'arriere', solutions: ['citiid'], parCote: true, cotes: COTES, coteObligatoire: true,
         pos: { Gauche: [165, 563], Droite: [250, 588] }, arbre: 'lecteur', picto: 'antenne-basse-frequence' },
@@ -57,7 +61,12 @@
       { id: 'bbv', code: 'BB',      label: 'Boîte à boutons (BBV)',  vue: 'arriere', solutions: ['citiid'], parCote: true, cotes: COTES, coteObligatoire: true,
         pos: { Gauche: [88, 352], Droite: [333, 385] }, arbre: 'bbv', picto: 'boite-a-boutons' },
       { id: 'nbab', code: 'NB',     label: 'NBAB (boîtier arrière)', vue: 'arriere', solutions: ['citiid'], pos: [525, 530], arbre: 'nbab' },
-      { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, cotes: COTES, coteObligatoire: false, arbre: 'cable' }
+      { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, cotes: COTES, coteObligatoire: false, arbre: 'cable' },
+
+      // Kit piéton (équipements à valider : absents de la documentation fournie)
+      { id: 'kp_phone',    code: 'SP', label: 'Smartphone (kit piéton)',  vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton' },
+      { id: 'kp_lecteur',  code: 'LP', label: 'Lecteur de puces',         vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton', picto: 'lecteur-rfid' },
+      { id: 'kp_chargeur', code: 'CH', label: 'Chargeur / batterie',      vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton' }
     ],
 
     gravites: [
@@ -81,7 +90,7 @@
       { id: 'v3', type: 'bom_bicomp_5050', solution: 'citiid', immat: 'GM120CD', agence: 'Lyon Est',  modele: 'Scania P280 26T bi-comp' },
       { id: 'v4', type: 'bom_bl',   solution: 'citimission', immat: 'GK901MN', agence: 'Villeurbanne', modele: 'Renault D Wide 26T + bras' },
       { id: 'v5', type: 'bom_26t',  solution: 'citipap',    immat: 'GP310EF', agence: 'Villeurbanne', modele: 'Volvo FE 26T',
-        equipements: ['tablette', 'support', 'k3'] },
+        complements: ['kitpieton'], equipements: ['tablette', 'support', 'k3', 'kp_phone', 'kp_lecteur', 'kp_chargeur'] },
       { id: 'v6', type: 'bennette', solution: 'citipap',    immat: 'FZ032RT', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
       { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
     ],

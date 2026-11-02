@@ -243,3 +243,14 @@
 .me-tour-bulle h3 { margin: 0; font-size: 16px; color: var(--marine); } .me-tour-bulle p { margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; }
 .me-tour-bulle .me-btn:disabled { opacity: .45; cursor: default; background: #fff; color: var(--marine); border-color: var(--marine); }
 @media (prefers-reduced-motion: reduce) { .me-tour-halo { transition: none; } }
+
+/* Ajout / modification de véhicule */
+.me-vhead { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.me-ajout { justify-content: center; border-style: dashed; }
+.me-case { display: flex !important; gap: 8px; align-items: flex-start; font-size: 13.5px !important; font-weight: 500 !important; color: var(--encre) !important; cursor: pointer; }
+.me-case input { width: auto !important; margin-top: 3px; accent-color: var(--marine); }
+.me-case small { display: block; font-size: 12px; }
+.me-kit { padding: 8px 10px; border: 1px solid var(--bord); border-radius: 8px; background: var(--fond); }
+.me-eqgroupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; padding: 4px 6px; }
+.me-eqgroupe b { grid-column: 1 / -1; font-size: 12px; color: var(--marine); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+.me-empty a { color: var(--bleu); font-weight: 700; }
