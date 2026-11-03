@@ -62,6 +62,14 @@
         pos: { Gauche: [88, 352], Droite: [333, 385] }, arbre: 'bbv', picto: 'boite-a-boutons' },
       { id: 'nbab', code: 'NB',     label: 'NBAB (boîtier arrière)', vue: 'arriere', solutions: ['citiid'], pos: [525, 530], arbre: 'nbab' },
       { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, cotes: COTES, coteObligatoire: false, arbre: 'cable' },
+      // Capteurs et stops du lève-conteneur (guide §4.3 et §6) : fournis par le carrossier, hors charge Simpliciti,
+      // mais indispensables à l'identification. Pas de point sur l'image (emplacement variable selon la benne).
+      { id: 'capt_bac', code: 'CB', label: 'Capteur de présence bac', vue: 'arriere', solutions: ['citiid'], parCote: true, hors: true,
+        cotes: ['Gauche', 'Droite', '4 roues'], coteObligatoire: true, arbre: 'capteur_bac', horsSimpliciti: true },
+      { id: 'capt_ph', code: 'PH',  label: 'Capteur de point haut',   vue: 'arriere', solutions: ['citiid'], parCote: true, hors: true,
+        cotes: COTES, coteObligatoire: true, arbre: 'capteur_ph', horsSimpliciti: true },
+      { id: 'stop_lc', code: 'ST',  label: 'Stops bac (lève-conteneur)', vue: 'arriere', solutions: ['citiid'], hors: true,
+        cotes: ['Gauche', 'Droite', '4 roues'], coteObligatoire: false, arbre: 'stopbac' },
 
       // Kit piéton : un seul équipement (smartphone lecteur de puces), présent dès que le véhicule a la solution
       { id: 'kp_kit', code: 'KP', label: 'Kit piéton', vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton', picto: 'lecteur-rfid' }
@@ -92,6 +100,12 @@
       { id: 'v6', type: 'bennette', solution: 'citipap',    immat: 'FZ032RT', agence: 'Villeurbanne', modele: 'Iveco Daily 3,5T' },
       { id: 'v7', type: 'grue_26t', solution: 'citipav',    immat: 'GN455ZX', agence: 'Lyon Est',     modele: 'Mercedes Arocs + grue' }
     ],
+
+    // Relance Simpliciti : un défaut non résolu est « à relancer » quand le dernier mail (signalement ou relance)
+    // date de plus de N jours. Seuils par gravité, à caler sur le contrat de service Simpliciti.
+    relance: { 1: 10, 2: 5, 3: 2, 4: 1 },
+    // Panne récurrente : même équipement (et même chaise) du même véhicule signalé au moins `seuil` fois sur `jours` jours
+    recidive: { jours: 90, seuil: 2 },
 
     // Mail de signalement : toujours adressé au service clients Simpliciti (ouverture de ticket).
     mail: { destinataire: 'service.clients@simpliciti.fr', copie: 'ri@paprec.com' },

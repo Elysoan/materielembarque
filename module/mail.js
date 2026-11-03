@@ -12,8 +12,55 @@
     out.push('- Cause probable : ' + d.cause, '- Action recommandée : ' + d.action);
     if (d.contact) out.push('- À transmettre à Simpliciti (ticket) avec ces informations.');
     if (d.piste) out.push('- Piste hors guide constructeur : à valider.');
+    if (d.horsSimpliciti) out.push('- Hors charge Simpliciti : intervention de l\'atelier ou du carrossier.');
     out.push('');
     return out;
+  }
+
+  // Panne récurrente : argument pour demander un remplacement ou une expertise plutôt qu'une nouvelle réparation
+  function recidiveLines(store, inc) {
+    const r = store.recidives(inc);
+    if (!store.estRecidive(inc)) return [];
+    const autres = r.filter(x => x.id !== inc.id);
+    return ['PANNE RÉCURRENTE',
+      '- ' + r.length + 'e signalement sur cet équipement' + (inc.cote ? ' (' + inc.cote + ')' : '') + ' en ' + ME.defaults.recidive.jours + ' jours.',
+      '- Précédents : ' + autres.map(x => x.id + ' du ' + fmt(x.creeLe).slice(0, 10) + (x.diagnostic ? ' (' + x.diagnostic.cause.replace(/\.$/, '') + ')' : '')).join(' ; '),
+      '- Merci d\'envisager un remplacement ou une expertise plutôt qu\'une nouvelle réparation.',
+      ''];
+  }
+
+  const ccDe = store => [store.copieFixe].concat(String(store.reglages().copie || '').split(/[;,]/)).map(x => x.trim()).filter((x, i, a) => x && a.indexOf(x) === i).join('; ');
+
+  /** Mail de relance d'un défaut non résolu : cite le n° de ticket Simpliciti et l'ancienneté. */
+  function relance(store, inc) {
+    const v = store.vehicule(inc.vehiculeId) || {};
+    const sol = store.solution(store.solutionDe(v, inc.equipId)) || {};
+    const n = (inc.relances || []).length + 1, jours = Math.max(1, Math.round((Date.now() - Date.parse(inc.creeLe)) / 864e5));
+    const subject = ['[' + (sol.label || 'Matériel embarqué') + ']', 'RELANCE' + (n > 1 ? ' ' + n : ''), inc.ticket ? '- Ticket ' + inc.ticket : '',
+      '-', store.libelle(inc), '-', v.immat].filter(Boolean).join(' ');
+    const envois = [inc.mailLe].concat(inc.relances || []).filter(Boolean);
+    const body = [
+      'Bonjour,',
+      '',
+      'Sauf erreur de notre part, le défaut ci-dessous n\'est toujours pas résolu' + (inc.ticket ? ' (ticket ' + inc.ticket + ')' : '') + '.',
+      '',
+      '- Véhicule : ' + v.immat + ' (' + (v.agence || '') + ')',
+      '- Équipement : ' + store.libelle(inc),
+      '- Gravité : ' + inc.gravite + ' / 4',
+      '- Signalé le ' + fmt(inc.creeLe) + ', il y a ' + jours + ' jour' + (jours > 1 ? 's' : ''),
+      '- Échanges précédents : ' + envois.map(d => fmt(d).slice(0, 10)).join(', '),
+      '- Notre référence : ' + inc.id,
+      '',
+      'Symptômes signalés :',
+      inc.symptomes,
+      ''
+    ].concat(recidiveLines(store, inc), [
+      'Pouvez-vous nous indiquer la date d\'intervention prévue ?',
+      '',
+      'Cordialement,',
+      store.reglages().declarant || inc.declarant || ''
+    ]).join('\n');
+    return { to: store.destinataire, cc: ccDe(store), subject, body };
   }
 
   function build(store, inc) {
@@ -22,7 +69,6 @@
     const sol = store.solution(store.solutionDe(v, inc.equipId)) || {}; // solution de l'équipement en défaut
     const equipLabel = store.libelle(inc);
     const g = ME.defaults.gravites.find(x => x.niveau === inc.gravite) || {};
-    const r = store.reglages();
     const urgent = inc.gravite >= 4 ? 'URGENT - ' : '';
 
     // Objet préfixé par la solution du véhicule : Simpliciti oriente le ticket dès sa réception
@@ -47,7 +93,7 @@
       'SYMPTÔMES',
       inc.symptomes,
       '',
-    ].concat(diagLines(inc.diagnostic), [
+    ].concat(diagLines(inc.diagnostic), recidiveLines(store, inc), [
       'INFORMATIONS',
       '- Constaté le : ' + fmt(inc.constateLe),
       '- Signalé par : ' + (inc.declarant || 'non renseigné'),
@@ -60,8 +106,7 @@
     ]).join('\n');
 
     // Copie : adresse fixe (ri@paprec.com) + copies supplémentaires des Réglages, sans doublon
-    const cc = [store.copieFixe].concat(String(r.copie || '').split(/[;,]/)).map(x => x.trim()).filter((x, i, a) => x && a.indexOf(x) === i).join('; ');
-    return { to: store.destinataire, cc, subject, body };
+    return { to: store.destinataire, cc: ccDe(store), subject, body };
   }
 
   /** Lien mailto: ; renvoie aussi `truncated` si le corps a dû être raccourci. */
@@ -109,5 +154,5 @@
     return lines.join('\r\n') + '\r\n\r\n' + wrap76(b64(m.body.replace(/\r?\n/g, '\r\n')));
   }
 
-  ME.mail = { build, mailto, eml, fmt };
+  ME.mail = { build, relance, mailto, eml, fmt };
 })(window);

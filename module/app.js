@@ -54,6 +54,25 @@
     const view = el.querySelector('.me-view');
     const dlg = el.querySelector('dialog');
 
+    /* ---------- Partage (SharePoint ou serveur fourni par l'outil global) ---------- */
+    const distant = opts.partage || (opts.sharepoint && ME.sharepoint && ME.sharepoint.depuis(opts.sharepoint));
+    let sync = null;
+    function pastilleSync() {
+      const host = el.querySelector('.me-sync');
+      if (!host || !sync) return;
+      const e = sync.etat, txt = e.listeAbsente ? 'Partage à configurer' : { connexion: 'Connexion…', envoi: 'Synchronisation…', ok: 'Partagé', horsligne: 'Hors ligne' }[e.phase];
+      host.className = 'me-sync me-sync-' + e.phase;
+      host.textContent = txt + (e.attente && e.phase !== 'ok' ? ' · ' + e.attente + ' en attente' : '');
+      host.title = e.phase === 'horsligne' ? e.erreur + ' : vos saisies restent sur ce poste et partiront au retour de la connexion.' : 'Données partagées via ' + e.nom + (e.derniere ? ' · dernière synchro ' + fmt(e.derniere) : '');
+      if (state.tab === 'regl') { const b = el.querySelector('[data-partage]'); if (b) b.innerHTML = partageHtml(); }
+    }
+    // Ne pas redessiner sous les doigts de l'utilisateur (saisie dans la vue en cours)
+    const saisieEnCours = () => { const a = document.activeElement; return a && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
+
+    // Panne récurrente : badge et liste des références
+    const recTag = (n) => '<span class="me-tag me-tag-rec" title="Panne récurrente : ' + n + ' signalements sur ' + D.recidive.jours + ' jours">↻ récurrent</span>';
+    const refs = list => list.map(x => '<a href="#" data-action="incident" data-id="' + x.id + '">' + x.id + '</a>').join(', ');
+
     /* ---------- Vue détaillée (image + points cliquables) ---------- */
     function vueHtml(v, vue) {
       const cfg = store.vues[vue], lignes = store.lignes(v, vue);
@@ -76,8 +95,9 @@
         '<button class="me-chip me-s' + sev(l) + '" ' + attrs(l) + '>' + esc(name(l)) + (sev(l) ? ' · ' + sev(l) : '') + '</button>').join('') + '</div>' : '';
 
       const rows = lignes.map(l => {
-        const n = sev(l), nb = store.ouverts(v.id, l.eq.id, l.cote).length;
-        return '<tr><td class="me-ico">' + (l.eq.picto ? '<img src="' + picto(l.eq.picto) + '" alt="">' : '') + '</td><td>' + esc(l.eq.label) + (l.cote ? ' <small>' + l.cote + '</small>' : '') + '</td><td>' + sevBadge(n) + '</td>' +
+        const n = sev(l), nb = store.ouverts(v.id, l.eq.id, l.cote).length, rec = store.recidives({ vehiculeId: v.id, equipId: l.eq.id, cote: l.cote }, new Date().toISOString());
+        return '<tr><td class="me-ico">' + (l.eq.picto ? '<img src="' + picto(l.eq.picto) + '" alt="">' : '') + '</td><td>' + esc(l.eq.label) + (l.cote ? ' <small>' + l.cote + '</small>' : '') +
+          (rec.length >= D.recidive.seuil ? ' ' + recTag(rec.length) : '') + '</td><td>' + sevBadge(n) + '</td>' +
           '<td><button class="me-btn" ' + attrs(l) + '>' + (nb ? 'Voir / ajouter' : 'Signaler') + '</button></td></tr>';
       }).join('');
 
@@ -263,6 +283,13 @@
         return d.length ? { lib: sevBadge(g.niveau), val: d.reduce((a, b) => a + b, 0) / d.length / 864e5, txt: duree(d.reduce((a, b) => a + b, 0) / d.length) + ' <small>(' + d.length + ')</small>',
           aide: 'Gravité ' + g.niveau + ' : délai moyen ' + duree(d.reduce((a, b) => a + b, 0) / d.length) + ' sur ' + d.length + ' signalement(s) résolu(s)' } : null;
       }).filter(Boolean);
+      // Pannes récurrentes : même véhicule, même équipement (et même chaise), au moins `seuil` signalements sur la période
+      const parCouple = {};
+      per.forEach(i => { const k = i.vehiculeId + '|' + i.equipId + '|' + (i.cote || ''); (parCouple[k] = parCouple[k] || []).push(i); });
+      const recs = Object.keys(parCouple).filter(k => parCouple[k].length >= D.recidive.seuil).sort((x, y) => parCouple[y].length - parCouple[x].length).slice(0, 6).map(k => {
+        const l = parCouple[k], v = store.vehicule(l[0].vehiculeId) || { immat: '(véhicule retiré)' };
+        return { lib: esc(v.immat) + ' <small>' + esc(store.libelle(l[0])) + '</small>', val: l.length, aide: v.immat + ' · ' + store.libelle(l[0]) + ' : ' + l.map(i => i.id).join(', ') };
+      });
       const vieux = all.filter(i => i.statut !== 'resolu').sort((a, b) => a.creeLe.localeCompare(b.creeLe))[0];
       const vieuxV = vieux && (store.vehicule(vieux.vehiculeId) || {});
 
@@ -275,40 +302,51 @@
         '<section class="me-panel"><h4>Délai de résolution par gravité</h4>' + barres(parG) +
           (dts.length ? '<p class="me-hint">Moyenne ' + duree(dts.reduce((a, b) => a + b, 0) / dts.length) + ' · médiane ' + duree(mediane(dts)) + ' · du signalement à la résolution</p>' : '') +
           (vieux ? '<p class="me-hint">Ouvert depuis le plus longtemps : <a href="#" data-action="incident" data-id="' + vieux.id + '">' + vieux.id + '</a> (' + esc(vieuxV.immat || '') + ', ' + esc(store.libelle(vieux)) + '), ' + duree(Date.now() - Date.parse(vieux.creeLe)) + '</p>' : '') +
-        '</section></div>';
+        '</section>' +
+        '<section class="me-panel"><h4>Pannes récurrentes <small>(même équipement, ' + D.recidive.seuil + ' fois ou plus)</small></h4>' + (recs.length ? barres(recs) : '<p class="me-empty">Aucune panne récurrente sur cette période.</p>') +
+          (recs.length ? '<p class="me-hint">Argument pour demander à Simpliciti un remplacement ou une expertise plutôt qu\'une réparation de plus.</p>' : '') + '</section></div>';
     }
 
     function renderHisto() {
       const q = state.fQ.toLowerCase();
       const list = store.incidents().filter(i => {
         const v = store.vehicule(i.vehiculeId) || {};
-        return (state.fStatut === '' || (state.fStatut === 'ouvert' ? i.statut !== 'resolu' : i.statut === state.fStatut)) &&
+        return (state.fStatut === '' || (state.fStatut === 'ouvert' ? i.statut !== 'resolu' : state.fStatut === 'relance' ? store.aRelancer(i) : i.statut === state.fStatut)) &&
           (!state.fSev || i.gravite === +state.fSev) &&
-          (!q || (i.id + ' ' + v.immat + ' ' + store.libelle(i) + ' ' + i.symptomes).toLowerCase().indexOf(q) >= 0);
+          (!q || (i.id + ' ' + v.immat + ' ' + store.libelle(i) + ' ' + i.symptomes + ' ' + (i.ticket || '')).toLowerCase().indexOf(q) >= 0);
       });
       const rows = list.map(i => {
         const v = store.vehicule(i.vehiculeId) || {};
         const d = i.resoluLe ? 'résolu en ' + duree(delaiRes(i)) : 'ouvert depuis ' + duree(Date.now() - Date.parse(i.creeLe));
         return '<tr class="me-click" tabindex="0" data-action="incident" data-id="' + i.id + '"><td class="me-id">' + i.id + '</td><td class="me-num">' + fmt(i.creeLe) + '</td><td class="me-immat">' + esc(v.immat || '—') + '</td>' +
-          '<td>' + esc(store.libelle(i)) + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td>' +
-          '<td class="me-num' + (!i.resoluLe && Date.now() - Date.parse(i.creeLe) > 7 * 864e5 ? ' me-retard' : '') + '">' + d + '</td><td>' + (i.mailLe ? 'Oui' : '-') + '</td></tr>';
+          '<td>' + esc(store.libelle(i)) + (store.estRecidive(i) ? ' ' + recTag(store.recidives(i).length) : '') + (i.diagnostic ? '<br><small>Cause : ' + esc(i.diagnostic.cause) + '</small>' : '') + '</td><td>' + sevBadge(i.gravite) + '</td><td>' + statutLabel(i.statut) + '</td>' +
+          '<td class="me-num' + (store.aRelancer(i) ? ' me-retard' : '') + '">' + d + '</td><td>' + suiviCellule(i) + '</td></tr>';
       }).join('');
-      const all = store.incidents(), open = all.filter(i => i.statut !== 'resolu');
+      const all = store.incidents(), open = all.filter(i => i.statut !== 'resolu'), aRel = open.filter(store.aRelancer);
       const dts = all.filter(i => i.resoluLe).map(delaiRes);
       const kpi = (lib, val, c, sous) => '<div class="me-kpi"' + (c ? ' style="--c:var(' + c + ')"' : '') + '><div class="lib">' + lib + '</div><div class="val">' + val + '</div>' + (sous ? '<div class="sous">' + sous + '</div>' : '') + '</div>';
       const kpis = '<div class="me-kpis">' + kpi('Défauts ouverts', open.length, open.length ? '--me-s2' : '--me-s0') +
         kpi('Majeurs ou critiques', open.filter(i => i.gravite >= 3).length, open.some(i => i.gravite >= 3) ? '--me-s3' : '--me-s0') +
+        kpi('À relancer', aRel.length ? '<a href="#" data-action="voir-relances">' + aRel.length + '</a>' : 0, aRel.length ? '--me-s3' : '--me-s0', open.filter(i => !i.mailLe).length ? open.filter(i => !i.mailLe).length + ' mail(s) non envoyé(s)' : 'délai selon la gravité') +
         kpi('Véhicules concernés', new Set(open.map(i => i.vehiculeId)).size + ' / ' + store.vehicules.length) +
         kpi('Délai moyen de résolution', dts.length ? duree(dts.reduce((a, b) => a + b, 0) / dts.length) : '—', '--bleu', dts.length ? 'médiane ' + duree(mediane(dts)) + ' · ' + dts.length + ' résolu' + (dts.length > 1 ? 's' : '') : 'aucun signalement résolu') + '</div>';
       const opt = (arr, cur, all) => '<option value="">' + all + '</option>' + arr.map(a => '<option value="' + a[0] + '"' + (String(a[0]) === String(cur) ? ' selected' : '') + '>' + a[1] + '</option>').join('');
       view.innerHTML = '<div class="me-stack"><div class="me-pad"><h2 class="me-label">Historique des signalements</h2>' + kpis + statsHtml(all) + '</div>' +
         '<div class="me-pad"><h2 class="me-label">Signalements</h2><div class="me-row">' +
         '<input type="search" style="flex:2;min-width:180px" placeholder="Rechercher…" value="' + esc(state.fQ) + '" data-input="fQ">' +
-        '<select style="flex:1;min-width:140px" data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
+        '<select style="flex:1;min-width:140px" data-input="fStatut">' + opt([['ouvert', 'Non résolus'], ['relance', 'À relancer'], ['resolu', 'Résolus']], state.fStatut, 'Tous statuts') + '</select>' +
         '<select style="flex:1;min-width:140px" data-input="fSev">' + opt(D.gravites.map(g => [g.niveau, g.niveau + ' · ' + g.label]), state.fSev, 'Toutes gravités') + '</select>' +
         '<span class="me-spacer"></span><button class="me-btn" data-action="csv">Export CSV</button></div>' +
-        '<div class="me-scroll"><table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Délai</th><th>Mail</th></tr></thead><tbody>' +
+        '<div class="me-scroll"><table class="me-table"><thead><tr><th>Réf.</th><th>Date</th><th>Véhicule</th><th>Équipement</th><th>Gravité</th><th>Statut</th><th>Délai</th><th>Suivi Simpliciti</th></tr></thead><tbody>' +
         (rows || '<tr><td colspan="8" class="me-empty">Aucun signalement pour ces filtres.</td></tr>') + '</tbody></table></div></div></div>';
+    }
+
+    function suiviCellule(i) {
+      const t = i.ticket ? '<span class="me-ticket">Ticket ' + esc(i.ticket) + '</span>' : '';
+      if (i.statut === 'resolu') return t || (i.mailLe ? 'Mail envoyé' : '-');
+      if (!i.mailLe && !i.ticket) return '<span class="me-tag me-tag-att">Mail à envoyer</span>';
+      if (store.aRelancer(i)) return t + ' <span class="me-tag me-tag-rel">À relancer</span>';
+      return t || 'Mail envoyé' + ((i.relances || []).length ? ' · ' + i.relances.length + ' relance' + (i.relances.length > 1 ? 's' : '') : '');
     }
 
     function importHtml() {
@@ -357,17 +395,32 @@
         '<p class="me-info">Les signalements sont adressés à <b>' + esc(store.destinataire) + '</b> ; <b>' + esc(store.copieFixe) + '</b> est toujours en copie ; l\'objet commence par la solution du véhicule (ex. [CITI\'ID]).</p>' +
         f('copie', 'Copie supplémentaire (facultatif)', 'atelier@… ; responsable@…') + f('declarant', 'Votre nom (signature)') +
         '<div class="me-actions"><button class="me-btn me-primary">Enregistrer</button></div>' +
-        '<h2 class="me-label">Données</h2><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
+        '<h2 class="me-label">Données</h2><div data-partage>' + partageHtml() + '</div><div class="me-actions" style="justify-content:flex-start"><button type="button" class="me-btn" data-action="json-out">Sauvegarder (JSON)</button>' +
         '<label class="me-btn">Restaurer (JSON)<input type="file" accept=".json" data-input="json-in" hidden></label>' +
         '<button type="button" class="me-btn me-danger" data-action="reset-ask">Tout effacer</button></div>' +
-        (state.resetAsk ? '<div class="me-warn">Effacer définitivement les ' + store.incidents().length + ' signalement(s) et le parc importé de ce navigateur ? Les réglages sont conservés. ' +
+        (state.resetAsk ? '<div class="me-warn">Effacer définitivement les ' + store.incidents().length + ' signalement(s) et le parc importé ' + (sync ? '<b>pour toute l\'équipe</b> (liste ' + esc(sync.etat.nom) + ')' : 'de ce navigateur') + ' ? Les réglages sont conservés. ' +
           'Pensez à « Sauvegarder (JSON) » avant si besoin.<div class="me-actions"><button type="button" class="me-btn" data-action="reset-non">Annuler</button>' +
           '<button type="button" class="me-btn me-danger-plein" data-action="reset-ok">Oui, tout effacer</button></div></div>' : '') +
-        '<p class="me-info">Les données sont stockées dans ce navigateur. Pour un usage partagé, branchez un stockage serveur (voir README).</p></form></div></div>';
+        '</form></div></div>';
+    }
+
+    function partageHtml() {
+      if (!sync) return '<p class="me-info">Les données sont enregistrées <b>dans ce navigateur uniquement</b> : vos collègues ne les voient pas. ' +
+        'Pour les partager, publiez l\'outil sur un site SharePoint : il utilisera automatiquement une liste du site (voir README, « Partage SharePoint »).</p>';
+      const e = sync.etat, d = e.distant;
+      const etat = { connexion: ['me-info', 'Connexion à ' + e.nom + '…'], envoi: ['me-info', 'Synchronisation en cours…'],
+        ok: ['me-ok', 'Données partagées avec l\'équipe via ' + e.nom + (e.derniere ? ' (dernière synchronisation ' + fmt(e.derniere) + ')' : '') + '.'],
+        horsligne: ['me-warn', e.erreur + '. Vos saisies restent sur ce poste' + (e.attente ? ' (' + e.attente + ' en attente)' : '') + ' et seront envoyées dès que possible.'] }[e.phase];
+      return '<div class="' + etat[0] + '">' + esc(etat[1]) + (d.site ? '<br><small>Site : ' + esc(d.site) + ' · liste « ' + esc(d.liste) + ' »' + (d.lien && e.phase === 'ok' ? ' · <a href="' + esc(d.lien) + '" target="_blank" rel="noopener">ouvrir la liste</a>' : '') + '</small>' : '') +
+        '<div class="me-actions" style="justify-content:flex-start">' + (e.listeAbsente && d.creerListe ? '<button type="button" class="me-btn me-vert" data-action="sync-creer">Créer la liste « ' + esc(d.liste) + ' »</button>' : '') +
+        '<button type="button" class="me-btn" data-action="sync-go">Synchroniser maintenant</button></div>' +
+        (e.listeAbsente ? '<p class="me-hint">Première utilisation sur ce site : la liste est créée en un clic (droits de gestion du site nécessaires), ou par votre administrateur SharePoint (voir README).</p>' : '') + '</div>';
     }
 
     function render() {
       el.querySelectorAll('.me-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.id === state.tab));
+      const nbR = store.incidents().filter(store.aRelancer).length, tabH = el.querySelector('.me-tabs [data-id=histo]');
+      tabH.innerHTML = 'Historique' + (nbR ? ' <span class="me-compteur" title="' + nbR + ' défaut(s) à relancer">' + nbR + '</span>' : '');
       ({ parc: renderParc, histo: renderHisto, regl: renderRegl })[state.tab]();
     }
 
@@ -397,6 +450,7 @@
           '<p>Gravité suggérée : ' + sevBadge(f.gravite) + ' <small>(appliquée ci-dessous, modifiable)</small></p>' +
           (f.contact ? '<p class="me-warn">À escalader à Simpliciti : joindre ce diagnostic au ticket (il sera repris dans le mail).</p>' : '') +
           (f.piste ? '<p class="me-warn">Piste hors guide constructeur : à valider avant d\'intervenir.</p>' : '') +
+          (f.horsSimpliciti ? '<p class="me-info">Hors charge Simpliciti : intervention de l\'atelier ou du carrossier. Le mail pourra leur être adressé.</p>' : '') +
           '<p class="me-hint">Source : ' + esc(f.source) + '</p><div class="me-actions"><button type="button" class="me-btn" data-action="diag-reset">Recommencer</button>' + back + '</div></div>';
       }
       const a = ME.diag.arbre(st), n = ME.diag.noeud(st);
@@ -422,10 +476,13 @@
       const ops = store.ouverts(v.id, equipId);
       const existing = ops.length ? '<div class="me-warn"><strong>' + ops.length + ' défaut(s) déjà ouvert(s) sur cet équipement :</strong><ul>' +
         ops.map(i => '<li><a href="#" data-action="incident" data-id="' + i.id + '">' + i.id + '</a> · ' + esc(store.libelle(i)) + ' · ' + sevBadge(i.gravite) + ' ' + esc(i.symptomes.slice(0, 80)) + '</li>').join('') + '</ul></div>' : '';
+      const prec = store.recidives({ vehiculeId: v.id, equipId, cote }, new Date().toISOString());
+      const recid = prec.length + 1 >= D.recidive.seuil && prec.length ? '<div class="me-warn me-rec"><b>↻ Panne récurrente</b> : ' + prec.length + ' signalement' + (prec.length > 1 ? 's' : '') +
+        ' sur cet équipement' + (cote ? ' (' + esc(cote) + ')' : '') + ' en ' + D.recidive.jours + ' jours (' + refs(prec) + '). Le mail le signalera et demandera un remplacement ou une expertise.</div>' : '';
       const chaise = e.cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
         '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + e.cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
       openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + (e.picto ? '<img class="me-ico-h" src="' + picto(e.picto) + '" alt="">' : '') + esc(e.label) + '</h3>' +
-        '<p class="me-sub">' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + existing + chaise +
+        '<p class="me-sub">' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + recid + existing + chaise +
         (e.arbre ? '<section class="me-diag" data-diag>' + diagBlock() + '</section>' : '') +
         '<fieldset><legend>Niveau de gravité</legend>' + D.gravites.map(g =>
           '<label class="me-sevopt me-sev' + g.niveau + '"><input type="radio" name="gravite" value="' + g.niveau + '" required' + (g.niveau === 2 ? ' checked' : '') + '>' +
@@ -469,25 +526,45 @@
     function incidentDialog(id) {
       const i = store.incident(id), v = store.vehicule(i.vehiculeId) || {}, d = i.diagnostic;
       openDlg(closeBtn + '<form class="me-form" data-form="update" data-id="' + id + '"><h3>' + id + ' <small>' + sevBadge(i.gravite) + '</small></h3>' +
-        '<p class="me-sub">' + esc(store.libelle(i)) + ' · ' + esc(v.immat) + '</p>' +
+        '<p class="me-sub">' + esc(store.libelle(i)) + ' · ' + esc(v.immat) + '</p>' + suiviHtml(i) +
         '<p class="me-pre">' + esc(i.symptomes) + '</p>' +
         (d ? '<details class="me-diag-hist-d"><summary>Diagnostic guidé : ' + esc(d.cause) + '</summary><ol class="me-diag-hist">' + d.chemin.map(c => '<li>' + esc(c.q) + ' <strong>→ ' + esc(c.r) + '</strong></li>').join('') + '</ol><p><strong>Action recommandée :</strong> ' + esc(d.action) + '</p></details>' : '') +
         '<p class="me-sub">Constaté le ' + fmt(i.constateLe) + ' par ' + esc(i.declarant) + '</p>' +
         '<div class="me-row"><label>Statut<select name="statut">' + D.statuts.map(s => '<option value="' + s.id + '"' + (s.id === i.statut ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select></label>' +
         '<label>Gravité<select name="gravite">' + D.gravites.map(g => '<option value="' + g.niveau + '"' + (g.niveau === i.gravite ? ' selected' : '') + '>' + g.niveau + ' · ' + g.label + '</option>').join('') + '</select></label></div>' +
+        '<label>N° de ticket Simpliciti<input name="ticket" value="' + esc(i.ticket || '') + '" placeholder="Reçu en réponse au mail" autocomplete="off"></label>' +
         '<label>Commentaire (ajouté au journal)<input name="commentaire" placeholder="Intervention prévue, pièce commandée, résolu par…"></label>' +
         '<h4>Journal</h4><ul class="me-log">' + i.journal.slice().reverse().map(j => '<li><time>' + fmt(j.at) + '</time> ' + esc(j.texte) + '</li>').join('') + '</ul>' +
-        '<div class="me-actions"><button type="button" class="me-btn" data-action="mail" data-id="' + id + '">Préparer le mail</button><button class="me-btn me-primary">Mettre à jour</button></div></form>');
+        '<div class="me-actions"><button type="button" class="me-btn" data-action="mail" data-id="' + id + '">' + (i.mailLe ? 'Revoir le mail' : 'Préparer le mail') + '</button>' +
+        (i.statut !== 'resolu' && i.mailLe ? '<button type="button" class="me-btn' + (store.aRelancer(i) ? ' me-vert' : '') + '" data-action="relancer" data-id="' + id + '">Relancer Simpliciti</button>' : '') +
+        '<button class="me-btn me-primary">Mettre à jour</button></div></form>');
+    }
+
+    // Où en est le signalement côté Simpliciti : mail, ticket, relances, récidive
+    function suiviHtml(i) {
+      const out = [], d = store.dernierMail(i), rec = store.recidives(i);
+      if (store.estRecidive(i)) out.push('<div class="me-warn me-rec"><b>↻ Panne récurrente</b> : ' + rec.length + 'e signalement en ' + D.recidive.jours + ' jours (' + refs(rec.filter(x => x.id !== i.id)) + ').</div>');
+      if (i.statut === 'resolu') return out.join('');
+      if (!i.mailLe) out.push('<p class="me-info">Mail pas encore envoyé à Simpliciti. <a href="#" data-action="mail" data-id="' + i.id + '">Le préparer</a></p>');
+      else if (store.aRelancer(i)) out.push('<p class="me-warn"><b>À relancer</b> : dernier mail il y a ' + duree(Date.now() - Date.parse(d)) + ' (délai fixé à ' + store.seuilRelance(i) + ' j pour la gravité ' + i.gravite + ').' +
+        (i.ticket ? '' : ' Pensez à noter le n° de ticket reçu.') + '</p>');
+      else out.push('<p class="me-hint">' + (i.ticket ? 'Ticket Simpliciti ' + esc(i.ticket) + ' · ' : '') + 'Dernier mail il y a ' + duree(Date.now() - Date.parse(d)) + ((i.relances || []).length ? ' (' + i.relances.length + ' relance' + (i.relances.length > 1 ? 's' : '') + ')' : '') +
+        ' · relance proposée après ' + store.seuilRelance(i) + ' j.</p>');
+      return out.join('');
     }
 
     let currentMail = null;
-    function mailDialog(id, fresh) {
-      const i = store.incident(id);
-      currentMail = { id, m: ME.mail.build(store, i) };
+    function mailDialog(id, fresh, relance) {
+      const i = store.incident(id), e = store.equipement(i.equipId) || {};
+      currentMail = { id, relance: !!relance, m: relance ? ME.mail.relance(store, i) : ME.mail.build(store, i) };
       const m = currentMail.m;
-      openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>Mail prêt à envoyer</h3>' + (fresh ? etapes(3) : '') +
-        (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique. <b>Étape suivante :</b> envoyez le mail, puis suivez le signalement dans l\'Historique (« En cours », puis « Résolu »).</p>' : '') +
-        '<label>À<input name="to" value="' + esc(m.to) + '" readonly></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
+      // Capteurs et lève-conteneur : hors charge Simpliciti, le destinataire peut être l'atelier ou le carrossier
+      const hors = !relance && (i.diagnostic ? i.diagnostic.horsSimpliciti : e.horsSimpliciti);
+      openDlg(closeBtn + '<form class="me-form" data-form="mail"><h3>' + (relance ? 'Relance prête à envoyer' : 'Mail prêt à envoyer') + '</h3>' + (fresh ? etapes(3) : '') +
+        (fresh ? '<p class="me-ok">Signalement ' + id + ' enregistré dans l\'historique. <b>Étape suivante :</b> envoyez le mail, notez le n° de ticket reçu en réponse, puis suivez le signalement dans l\'Historique.</p>' : '') +
+        (relance ? '<p class="me-hint">' + (i.ticket ? 'Ticket ' + esc(i.ticket) + ' · ' : 'Pas de n° de ticket noté : ajoutez-le dans le signalement si vous l\'avez reçu · ') + 'relance n°' + ((i.relances || []).length + 1) + '</p>' : '') +
+        (hors ? '<p class="me-warn">Équipement hors charge Simpliciti : remplacez le destinataire par l\'atelier ou le carrossier si c\'est à eux d\'intervenir.</p>' : '') +
+        '<label>À<input name="to" value="' + esc(m.to) + '"' + (hors ? '' : ' readonly') + '></label><label>Cc<input name="cc" value="' + esc(m.cc) + '"></label>' +
         '<label>Objet<input name="subject" value="' + esc(m.subject) + '"></label>' +
         '<label>Message<textarea name="body" rows="14">' + esc(m.body) + '</textarea></label>' +
         '<p class="me-hint" data-note>' + (emlOk ? '' : 'Si Outlook ne s\'ouvre pas, copiez le message et collez-le dans un nouveau mail.') + '</p>' +
@@ -498,6 +575,12 @@
     const readMail = () => {
       const f = dlg.querySelector('[data-form="mail"]');
       return { to: f.to.value.trim(), cc: f.cc.value.trim(), subject: f.subject.value, body: f.body.value };
+    };
+    // Un mail ouvert dans Outlook ou téléchargé compte comme envoyé (une fois par ouverture du dialogue)
+    const marquer = mode => {
+      if (currentMail.fait) return; currentMail.fait = true;
+      if (currentMail.relance) store.markRelance(currentMail.id, mode); else store.markMail(currentMail.id, mode);
+      render();
     };
     const note = t => { const n = dlg.querySelector('[data-note]'); if (n) n.textContent = t; };
 
@@ -516,6 +599,7 @@
         if (souligner('.me-hot, .me-chip')) toast('Cliquez sur un point : il ouvre le signalement avec le diagnostic guidé.');
         else toast('Choisissez d\'abord un véhicule dans la liste de gauche.');
       },
+      'voir-relances': () => { state.fStatut = 'relance'; render(); souligner('tr.me-click'); },
       'guide-suivi': () => { state.tab = 'histo'; state.fStatut = ''; render(); souligner('tr.me-click'); toast('Ouvrez un signalement pour changer son statut.'); },
       vehicle: t => { state.vehicleId = t.dataset.id; render(); },
       vue: t => { state.vue = t.dataset.id; render(); },
@@ -538,6 +622,8 @@
         const id = dlg.querySelector('[data-form=vehicule]').dataset.id, v = store.vehicule(id);
         store.removeVehicule(id); dlg.close(); render(); toast(v.immat + ' retiré du parc.');
       },
+      'sync-go': () => { sync.synchroniser().then(() => { render(); toast(sync.etat.phase === 'ok' ? 'Données à jour.' : sync.etat.erreur); }); },
+      'sync-creer': () => { sync.creerListe().then(() => { render(); toast('Liste créée : les données sont maintenant partagées.'); }, e => toast('Création impossible' + (e && e.status === 403 ? ' : droits insuffisants, demandez à l\'administrateur du site.' : '.'))); },
       'reset-ask': () => { state.resetAsk = true; render(); },
       'reset-non': () => { state.resetAsk = false; render(); },
       'reset-ok': () => { store.reset(); state.resetAsk = false; state.importRes = null; render(); toast('Données effacées : l\'outil repart de zéro.'); },
@@ -561,15 +647,20 @@
       csv: () => save('historique-materiel-embarque.csv', store.exportCSV(), 'text/csv;charset=utf-8', 'Historique exporté.'),
       'json-out': () => save('materiel-embarque-sauvegarde.json', store.exportJSON(), 'application/json', 'Sauvegarde enregistrée.'),
       mail: t => mailDialog(t.dataset.id, false),
+      relancer: t => { // n° de ticket saisi juste avant : enregistré pour figurer dans la relance
+        const f = dlg.querySelector('[data-form=update]'), i = store.incident(t.dataset.id), tk = f && f.ticket.value.trim();
+        if (f && tk !== (i.ticket || '')) store.update(i.id, { ticket: tk }, tk ? 'Ticket Simpliciti : ' + tk : 'N° de ticket retiré');
+        mailDialog(t.dataset.id, false, true);
+      },
       outlook: () => {
         const m = readMail(), r = ME.mail.mailto(m);
-        store.markMail(currentMail.id, 'Outlook');
+        marquer('Outlook');
         const a = document.createElement('a'); a.href = r.url; a.click();
         note(r.truncated ? 'Message trop long pour un lien Outlook : il a été tronqué. ' + (emlOk ? 'Utilisez le .eml' : 'Utilisez « Copier »') + ' pour le texte complet.' : 'Outlook doit s\'ouvrir avec le message. Sinon, ' + (emlOk ? 'utilisez le .eml.' : 'utilisez « Copier ».'));
       },
       eml: () => {
         const m = readMail();
-        store.markMail(currentMail.id, '.eml');
+        marquer('.eml');
         save(currentMail.id + '.eml', ME.mail.eml(m), 'message/rfc822').then(() => note('Ouvrez le fichier téléchargé : Outlook l\'ouvre en brouillon, prêt à envoyer.'));
       },
       copy: () => {
@@ -664,14 +755,20 @@
         const statut = f.statut.value, gravite = +f.gravite.value;
         if (statut !== i.statut) parts.push('Statut : ' + statutLabel(i.statut) + ' → ' + statutLabel(statut));
         if (gravite !== i.gravite) parts.push('Gravité : ' + i.gravite + ' → ' + gravite);
+        const ticket = f.ticket.value.trim();
+        if (ticket !== (i.ticket || '')) parts.push(ticket ? 'Ticket Simpliciti : ' + ticket : 'N° de ticket retiré');
         if (f.commentaire.value.trim()) parts.push(f.commentaire.value.trim());
-        store.update(id, { statut, gravite }, parts.join(' · '));
+        store.update(id, { statut, gravite, ticket }, parts.join(' · '));
         dlg.close(); render(); toast(id + ' mis à jour.');
       }
     });
 
+    if (distant) {
+      el.querySelector('.me-head .me-spacer').insertAdjacentHTML('afterend', '<span class="me-sync" role="status"></span>');
+      sync = ME.partage(store, distant, { onEtat: pastilleSync, onDistant: () => { if (!saisieEnCours()) render(); } });
+    }
     render();
-    return { refresh: render, store };
+    return { refresh: render, store, sync };
   }
 
   ME.mount = mount;

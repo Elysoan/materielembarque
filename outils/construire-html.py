@@ -4,7 +4,7 @@ import base64, re, pathlib
 
 RACINE = pathlib.Path(__file__).resolve().parent.parent
 M = RACINE / 'module'
-SCRIPTS = ['vendor/xlsx-0.18.5.full.min.js', 'data.js', 'store.js', 'mail.js', 'arbres.js', 'parc-import.js', 'app.js']
+SCRIPTS = ['vendor/xlsx-0.18.5.full.min.js', 'data.js', 'store.js', 'mail.js', 'arbres.js', 'parc-import.js', 'partage.js', 'app.js']
 MIME = {'.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png',
         '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
 
@@ -25,7 +25,7 @@ DEMO = r"""
 (function () {
   const ME = window.MaterielEmbarque, CLE = 'materielembarque.demo';
   document.getElementById('demo-reset').onclick = function () { try { localStorage.removeItem(CLE); } catch (e) {} location.reload(); };
-  const app = ME.mount(document.getElementById('app'), { version: 'v0.4 · démo', cleStockage: CLE, guide: false });
+  const app = ME.mount(document.getElementById('app'), { version: 'v0.5 · démo', cleStockage: CLE, guide: false });
   const st = app.store;
   if (st.incidents().length) return;
   st.setReglages({ declarant: 'Démo' });
@@ -36,7 +36,12 @@ DEMO = r"""
     const inc = st.add(Object.assign({ declarant: o.qui || 'Démo', constateLe: il(o.j), creeLe: t }, o.f));
     inc.journal[0].at = t;
     (suite || []).forEach(x => st.update(inc.id, x[0], x[1]));
-    if (o.mail) st.markMail(inc.id, 'Outlook');
+    if (o.mail) { // mail daté du signalement (et non de la création de la démo) : alimente les relances
+      st.markMail(inc.id, 'Outlook');
+      const x = st.incident(inc.id); x.mailLe = t; x.journal[x.journal.length - 1].at = t;
+      if (o.ticket) { x.ticket = o.ticket; x.journal.push({ at: il(o.j - 0.5), texte: 'Ticket Simpliciti : ' + o.ticket }); }
+      st.update(inc.id, {});
+    }
     if (o.resolu != null) { // date de résolution réaliste (et non l'instant de création de la démo)
       const x = st.incident(inc.id); x.resoluLe = il(o.resolu);
       x.journal.forEach(e => { if (/Résolu/.test(e.texte)) e.at = x.resoluLe; });
@@ -48,18 +53,18 @@ DEMO = r"""
   cree({ j: 1, mail: 1, qui: 'K. Martin (chef d\'équipe)', f: { vehiculeId: 'v1', equipId: 'ant_ar', cote: 'Gauche', gravite: 3,
     symptomes: 'Chaise gauche : aucune puce lue depuis la prise de poste, voyant rouge fixe sur la BBV gauche. Chaise droite normale.', diagnostic: diag('lecteur', [0, 0, 1, 0]) } });
   // BOM 214 : BBV droite, un bouton HS
-  cree({ j: 4, mail: 1, qui: 'S. Bernard (ripeur)', f: { vehiculeId: 'v1', equipId: 'bbv', cote: 'Droite', gravite: 2,
+  cree({ j: 4, mail: 1, ticket: 'CS-24817', qui: 'S. Bernard (ripeur)', f: { vehiculeId: 'v1', equipId: 'bbv', cote: 'Droite', gravite: 2,
     symptomes: 'Le bouton du bas de la boîte droite ne répond plus ; les voyants s\'allument.', diagnostic: diag('bbv', [0]) } },
     [[{ statut: 'en_cours' }, 'Statut : Ouvert → En cours · BBV commandée chez Simpliciti']]);
   // BOM 587 (CITI'ID) : tablette qui ne charge pas
-  cree({ j: 3, mail: 1, qui: 'A. Petit (conducteur)', f: { vehiculeId: 'v2', equipId: 'tablette', gravite: 2,
+  cree({ j: 3, mail: 1, ticket: 'CS-24829', qui: 'A. Petit (conducteur)', f: { vehiculeId: 'v2', equipId: 'tablette', gravite: 2,
     symptomes: 'La tablette s\'éteint en tournée, l\'icône de charge n\'apparaît pas sur le support.', diagnostic: diag('tablette', [0, 1]) } },
     [[{ statut: 'en_cours' }, 'Statut : Ouvert → En cours · Support de charge à remplacer']]);
   // BOM 120 (bicomp CITI'ID) : NBAB qui redémarre en boucle -> critique
   cree({ j: 0, mail: 1, qui: 'K. Martin (chef d\'équipe)', f: { vehiculeId: 'v3', equipId: 'nbab', gravite: 4,
     symptomes: 'Le NBAB redémarre en boucle ; aucune identification possible. Véhicule bloqué au dépôt pour la tournée bicomp.', diagnostic: diag('nbab', [0, 0, 1]) } });
   // BOM 310 (CITIPAP) : K3 sans communication
-  cree({ j: 6, mail: 1, qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v5', equipId: 'k3', gravite: 3,
+  cree({ j: 6, mail: 1, ticket: 'CS-24790', qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v5', equipId: 'k3', gravite: 3,
     symptomes: 'Plus de remontée de position dans GeoRed depuis lundi. Voyant GPS vert clignotant, voyant communication rouge fixe.', diagnostic: diag('k3', [4, 0]) } });
   // BEN 032 (CITIPAP) : résolu
   cree({ j: 12, resolu: 10, mail: 1, qui: 'A. Petit (conducteur)', f: { vehiculeId: 'v6', equipId: 'ant_cab', gravite: 2,
@@ -72,6 +77,8 @@ DEMO = r"""
     [[{ statut: 'resolu' }, 'Statut : Ouvert → Résolu · Support resserré par l\'atelier']]);
   // Historique résolu sur deux mois : alimente les statistiques (équipements, véhicules, délais)
   cree({ j: 25, resolu: 23, mail: 1, f: { vehiculeId: 'v1', equipId: 'ant_ar', cote: 'Droite', gravite: 3, symptomes: 'Lecture intermittente à droite, puces lues seulement de très près.', diagnostic: diag('lecteur', [3, 1, 0, 0]) } }, resolu('Dent antenne remplacée'));
+  // Même chaise gauche du GH214AB : le défaut du jour devient une panne récurrente
+  cree({ j: 30, resolu: 27, mail: 1, f: { vehiculeId: 'v1', equipId: 'ant_ar', cote: 'Gauche', gravite: 3, symptomes: 'Chaise gauche : puces non lues une levée sur deux.', diagnostic: diag('lecteur', [2, 0, 0]) } }, resolu('Dent antenne gauche remplacée'));
   cree({ j: 41, resolu: 37, mail: 1, f: { vehiculeId: 'v1', equipId: 'decodeur', cote: 'Gauche', gravite: 3, symptomes: 'Lecteur gauche absent de la checklist.', diagnostic: diag('lecteur', [0, 0, 0]) } }, resolu('Décodeur remplacé'));
   cree({ j: 58, resolu: 57, mail: 1, f: { vehiculeId: 'v1', equipId: 'nbab', gravite: 4, symptomes: 'NBAB éteint à la prise de poste, aucune identification.', diagnostic: diag('nbab', [0, 1]) } }, resolu('Fusible BDCI remplacé'));
   cree({ j: 33, resolu: 32, mail: 1, f: { vehiculeId: 'v2', equipId: 'k3', gravite: 3, symptomes: 'Voyant GPS du K3 éteint.', diagnostic: diag('k3', [0]) } }, resolu('Faisceau d\'alimentation K3 rebranché'));
@@ -107,7 +114,7 @@ body {{ margin: 0; background: #F5F7FA; }}
 {js(assets)}
 </script>
 """ + ''.join('<script>\n' + js((M / s).read_text(encoding='utf-8')) + '\n</script>\n' for s in SCRIPTS) + \
-    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.4', vehicules: [] });</script>\n") + """</body>
+    ('<script>' + js(DEMO) + '</script>\n' if demo else "<script>MaterielEmbarque.mount(document.getElementById('app'), { version: 'v0.5', vehicules: [], sharepoint: 'auto' });</script>\n") + """</body>
 </html>
 """
     sortie = RACINE / 'dist' / ('materiel-embarque-demo.html' if demo else 'materiel-embarque.html')

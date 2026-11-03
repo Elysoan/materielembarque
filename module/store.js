@@ -1,5 +1,6 @@
-/* Persistance : localStorage par défaut. Pour brancher l'outil global (API, SharePoint, base...),
-   passer un `storage` ({ load(): object|null, save(obj) }) à mount(). */
+/* Persistance : localStorage par défaut (cache local, toujours présent). Pour brancher l'outil global (API, base...),
+   passer un `storage` ({ load(): object|null, save(obj) }) à mount(). Le partage entre utilisateurs (SharePoint)
+   passe par partage.js, qui synchronise les enregistrements (records / chargerRecords) avec le serveur. */
 (function (root) {
   const ME = root.MaterielEmbarque;
   const KEY = 'materielembarque.v2';
@@ -32,7 +33,7 @@
     const equipements = opts.equipements || D.equipements;
     const vues = opts.vues || D.vues;
 
-    const persist = () => storage.save(data);
+    const persist = () => { storage.save(data); if (api.onPersist) api.onPersist(); };
     const now = () => new Date().toISOString();
 
     function nextId() {
@@ -132,9 +133,59 @@
       /** Repart de zéro : signalements et parc importé effacés (les réglages sont conservés). */
       reset() { data.incidents = []; data.parc = null; persist(); },
       markMail(id, mode) { api.update(id, { mailLe: now() }, 'Mail préparé (' + mode + ')'); },
+      markRelance(id, mode) {
+        const inc = api.incident(id), rel = (inc.relances || []).concat(now());
+        api.update(id, { relances: rel }, 'Relance n°' + rel.length + ' préparée (' + mode + ')');
+      },
+
+      /** Date du dernier mail envoyé à Simpliciti (signalement ou relance), ou null. */
+      dernierMail: inc => (inc.relances && inc.relances.length ? inc.relances[inc.relances.length - 1] : inc.mailLe) || null,
+      seuilRelance: inc => (D.relance || {})[inc.gravite] || 5,
+      /** Défaut ouvert dont le dernier mail date de plus que le seuil de sa gravité. */
+      aRelancer(inc) {
+        const d = api.dernierMail(inc);
+        return inc.statut !== 'resolu' && !!d && Date.now() - Date.parse(d) > api.seuilRelance(inc) * 864e5;
+      },
+      /** Signalements du même équipement (et de la même chaise) du même véhicule sur la fenêtre de récidive,
+          jusqu'à la date de référence (incluse). `x` : incident ou { vehiculeId, equipId, cote }. */
+      recidives(x, refIso) {
+        const cfg = D.recidive || { jours: 90, seuil: 2 }, ref = Date.parse(refIso || x.creeLe || now()), debut = ref - cfg.jours * 864e5;
+        return data.incidents.filter(i => i.vehiculeId === x.vehiculeId && i.equipId === x.equipId && (!x.cote || !i.cote || i.cote === x.cote) &&
+          Date.parse(i.creeLe) >= debut && Date.parse(i.creeLe) <= ref + 1000).sort((a, b) => a.creeLe.localeCompare(b.creeLe));
+      },
+      estRecidive(x, refIso) { return api.recidives(x, refIso).length >= ((D.recidive || {}).seuil || 2); },
 
       reglages: () => data.reglages,
       setReglages(r) { Object.assign(data.reglages, r); persist(); },
+
+      /* Enregistrements unitaires pour la synchronisation : un par signalement, un par véhicule, un pour l'en-tête du parc. */
+      records() {
+        const out = {};
+        data.incidents.forEach(i => { out['inc:' + i.id] = i; });
+        if (data.parc) {
+          out.parc = { fichier: data.parc.fichier || '', importeLe: data.parc.importeLe || null, modifieLe: data.parc.modifieLe || null };
+          data.parc.vehicules.forEach((v, n) => { out['veh:' + v.id] = Object.assign({}, v, { ordre: n }); });
+        }
+        return out;
+      },
+      /** Remplace signalements et parc par ces enregistrements (sans renvoyer au serveur). */
+      chargerRecords(recs) {
+        const cles = Object.keys(recs);
+        data.incidents = cles.filter(k => k.indexOf('inc:') === 0).map(k => recs[k]);
+        const vs = cles.filter(k => k.indexOf('veh:') === 0).map(k => recs[k])
+          .sort((a, b) => (a.ordre == null ? 1e9 : a.ordre) - (b.ordre == null ? 1e9 : b.ordre) || String(a.immat).localeCompare(b.immat))
+          .map(v => { const c = Object.assign({}, v); delete c.ordre; return c; });
+        data.parc = recs.parc || vs.length ? Object.assign({ fichier: '', importeLe: null }, recs.parc || {}, { vehicules: vs }) : null;
+        storage.save(data);
+      },
+      /** Renumérote un signalement (collision de référence entre deux postes). */
+      renumeroter(id) {
+        const inc = api.incident(id); if (!inc) return null;
+        const ancien = inc.id.replace(/~$/, ''); inc.id = 'tmp'; inc.id = nextId();
+        inc.journal.push({ at: now(), texte: 'Référence ' + ancien + ' déjà utilisée sur un autre poste : renumérotée ' + inc.id });
+        persist();
+        return inc.id;
+      },
 
       exportJSON: () => JSON.stringify({ incidents: data.incidents, reglages: data.reglages, parc: data.parc }, null, 2),
       importJSON(text) {
@@ -146,12 +197,12 @@
         persist();
       },
       exportCSV() {
-        const cols = ['id', 'creeLe', 'immat', 'solution', 'equipement', 'gravite', 'statut', 'symptomes', 'cause_probable', 'declarant', 'resoluLe', 'mailLe'];
+        const cols = ['id', 'creeLe', 'immat', 'solution', 'equipement', 'gravite', 'statut', 'symptomes', 'cause_probable', 'declarant', 'resoluLe', 'mailLe', 'ticket', 'relances', 'recidive'];
         const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"';
         const rows = api.incidents().map(i => {
           const v = api.vehicule(i.vehiculeId) || {}, s = api.solution(v.solution) || {};
           return [i.id, i.creeLe, v.immat, s.label, api.libelle(i), i.gravite, i.statut, i.symptomes,
-            i.diagnostic && i.diagnostic.cause, i.declarant, i.resoluLe, i.mailLe].map(q).join(';');
+            i.diagnostic && i.diagnostic.cause, i.declarant, i.resoluLe, i.mailLe, i.ticket, (i.relances || []).length, api.estRecidive(i) ? 'oui' : ''].map(q).join(';');
         });
         return '﻿' + cols.join(';') + '\r\n' + rows.join('\r\n'); // BOM + ';' => ouverture directe dans Excel FR
       }

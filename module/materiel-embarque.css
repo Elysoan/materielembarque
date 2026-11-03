@@ -254,3 +254,20 @@
 .me-eqgroupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; padding: 4px 6px; }
 .me-eqgroupe b { grid-column: 1 / -1; font-size: 12px; color: var(--marine); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
 .me-empty a { color: var(--bleu); font-weight: 700; }
+
+/* Suivi Simpliciti : relances, tickets, pannes récurrentes */
+.me-compteur { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 99px; background: var(--rouge); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.me-tag-rec { color: var(--marine); background: var(--bleu-clair); border-color: var(--bleu-bord); }
+.me-tag-rel { color: #fff; background: var(--rouge); border-color: var(--rouge); }
+.me-tag-att { color: var(--orange-texte); }
+.me-ticket { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--marine); white-space: nowrap; }
+.me-kpi .val a { color: inherit; }
+
+/* Partage : pastille d'état dans l'en-tête */
+.me-sync { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #fff; padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .12); cursor: default; }
+.me-sync::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #B9C3D0; }
+.me-sync-ok::before { background: #9BCB3A; }
+.me-sync-envoi::before, .me-sync-connexion::before { background: #fff; animation: me-clign 1s infinite alternate; }
+.me-sync-horsligne { background: rgba(219, 114, 46, .35); } .me-sync-horsligne::before { background: var(--orange); }
+@keyframes me-clign { to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .me-sync::before { animation: none !important; } }

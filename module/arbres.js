@@ -208,6 +208,70 @@
       }
     },
 
+    capteur_bac: {
+      titre: 'Capteur de présence bac', source: 'Guide Simpliciti §4.3.1',
+      rappel: 'Checklist : présenter un bac pucé sur les peignes gauche et droite, puis passer le lève-conteneur en mode 4 roues et présenter un bac 4 roues. Chaque accrochage doit allumer sa case en vert.', debut: 'q0',
+      noeuds: {
+        q0: { q: 'Dans la checklist, que voit-on pour ce capteur ?', options: [
+          { r: 'La case ne passe pas au vert à l\'accrochage du bac (ou le capteur n\'apparaît pas)',
+            fin: { cause: 'Capteur de présence bac hors service ou débranché.', action: 'Vérifier le branchement du capteur, sinon le faire réparer ou remplacer par l\'atelier / le carrossier.', gravite: 3, horsSimpliciti: true } },
+          { r: 'La case est verte en permanence, même sans bac',
+            fin: { cause: 'Capteur actif en permanence (bloqué ou déréglé).', action: 'Faire réparer ou remplacer le capteur par l\'atelier / le carrossier.', gravite: 3, horsSimpliciti: true } },
+          { r: 'Les cases passent bien au vert, mais les levées ne sont pas lues en tournée', arbre: 'lecteur' }
+        ] }
+      }
+    },
+
+    capteur_ph: {
+      titre: 'Capteur de point haut', source: 'Guide Simpliciti §4.3.2',
+      rappel: 'Checklist : faire un cycle de levée complet à droite puis à gauche. Chaque cycle doit allumer sa case en vert.', debut: 'q0',
+      noeuds: {
+        q0: { q: 'Que voit-on dans la checklist ?', options: [
+          { r: 'Un seul point haut n\'est pas détecté',
+            fin: { cause: 'Panne du capteur de point haut concerné.', action: 'Vérifier son branchement, sinon le faire réparer ou remplacer par l\'atelier / le carrossier.', gravite: 3, horsSimpliciti: true } },
+          { r: 'Aucun point haut n\'est détecté', suite: 'q1' },
+          { r: 'Les points hauts sont détectés, mais les levées ne sont pas lues en tournée', arbre: 'lecteur' }
+        ] },
+        q1: { q: 'Ces capteurs ont-ils déjà fonctionné sur ce véhicule ?', options: [
+          { r: 'Non, jamais', fin: { cause: 'Option « point haut » probablement non activée sur le véhicule.', action: 'Faire activer l\'option point haut (carrossier), puis refaire la checklist.', gravite: 3, horsSimpliciti: true } },
+          { r: 'Oui, ils fonctionnaient', fin: { cause: 'Panne commune aux points hauts (alimentation, faisceau ou prédisposition au NBAB).', action: 'Vérifier le branchement des prédispositions capteurs au NBAB, puis ' + SIMPLICITI + ' avec le détail des tests.', gravite: 3, contact: true, piste: true } }
+        ] }
+      }
+    },
+
+    stopbac: {
+      titre: 'Stops bac (lève-conteneur)', source: 'Guide Simpliciti §6',
+      rappel: 'Lancer une tournée dédiée avec le paramétrage « stops LC pour bac sans puce » actif. Prévoir un bac 2 roues et un bac 4 roues, pucés et non pucés.', debut: 'q0',
+      noeuds: {
+        q0: { q: 'Quel est le problème ?', options: [
+          { r: 'Les bacs non lus ne sont jamais stoppés', suite: 'n0' },
+          { r: 'Le lève-conteneur stoppe à chaque levée, même les bacs pucés', suite: 'p0' },
+          { r: 'Un bac pucé est stoppé de temps en temps', arbre: 'lecteur', noeud: 's0' }
+        ] },
+        n0: { q: 'Présenter un bac SANS puce à gauche, à droite et en 4 roues. Que se passe-t-il ?', options: [
+          { r: 'Le bac est stoppé, voyant BBV rouge et pop-up de blocage sur la tablette',
+            fin: { cause: 'Tout fonctionne en tournée de test.', action: 'Aucune intervention matérielle. Si le problème revient en exploitation, vérifier le paramétrage stop bac des tournées concernées.', gravite: 1, piste: true } },
+          { r: 'La levée n\'est pas stoppée, mais le voyant BBV est rouge et le pop-up apparaît',
+            fin: { cause: 'Stops du lève-conteneur non activés côté benne.', action: 'Contacter le bennier (carrossier) pour qu\'il contrôle l\'activation des stops du lève-conteneur.', gravite: 2, horsSimpliciti: true } },
+          { r: 'La levée n\'est pas stoppée, voyant BBV pas rouge, pas de pop-up', suite: 'n1' }
+        ] },
+        n1: { q: 'Sur la tablette, le paramétrage « stop bac non pucé » est-il activé ?', options: [
+          { r: 'Oui', fin: { cause: 'Paramétrage actif mais sans effet : problème de paramétrage système.', action: SIMPLICITI + ' pour vérification du paramétrage système et analyse approfondie.', gravite: 2, contact: true } },
+          { r: 'Non', fin: { cause: 'Paramétrage « stop bac non pucé » désactivé.', action: 'L\'activer, puis refaire le test.', gravite: 1 } }
+        ] },
+        p0: { q: 'Présenter un bac AVEC puce à gauche, à droite et en 4 roues. Que se passe-t-il ?', options: [
+          { r: 'Le bac est levé et basculé, voyant BBV vert, levée comptabilisée sur la tablette',
+            fin: { cause: 'Tout fonctionne en tournée de test.', action: 'Aucune intervention matérielle. Si le problème revient en exploitation, refaire le test sur la tournée concernée.', gravite: 1, piste: true } },
+          { r: 'Le bac est stoppé, voyant BBV rouge et pop-up de blocage', arbre: 'lecteur' },
+          { r: 'Le bac est stoppé, voyant BBV vert et pas de pop-up', suite: 'p1' }
+        ] },
+        p1: { q: 'Débrancher le port 1 du NBAB et représenter le bac pucé. Est-il encore stoppé ?', options: [
+          { r: 'Non, il n\'est plus stoppé', fin: { cause: 'Commande d\'arrêt émise par le système d\'identification.', action: SIMPLICITI + ' pour analyse approfondie.', gravite: 3, contact: true } },
+          { r: 'Oui, encore stoppé', fin: { cause: 'Le problème vient du comportement du lève-conteneur.', action: 'Contacter le bennier (carrossier) pour analyse et correction.', gravite: 3, horsSimpliciti: true } }
+        ] }
+      }
+    },
+
     cable: {
       titre: 'Câble', source: 'Guide Simpliciti §4', debut: 'q0',
       noeuds: {
@@ -241,7 +305,7 @@
     resume(st) {
       return st.fin && {
         chemin: st.chemin.map(c => ({ q: c.q, r: c.r })),
-        cause: st.fin.cause, action: st.fin.action, contact: !!st.fin.contact, piste: !!st.fin.piste, source: st.fin.source
+        cause: st.fin.cause, action: st.fin.action, contact: !!st.fin.contact, piste: !!st.fin.piste, horsSimpliciti: !!st.fin.horsSimpliciti, source: st.fin.source
       };
     }
   };
