@@ -26,8 +26,9 @@
       { id: 'bom_32t',  label: 'BOM 32 T',  picto: 'bom-32t',  zones: true },
       { id: 'bom_75t',  label: 'BOM 7,5 T', picto: 'bom-7-5t-avec-porte-arriere', zones: true },
       { id: 'bennette', label: 'Bennette 3,5 T', picto: 'bennette-3-5t', zones: true },
-      { id: 'bom_bicomp_5050', label: 'BOM bicomp 50/50', picto: 'bom-bicomp-50-50' },
-      { id: 'bom_bicomp_7030', label: 'BOM bicomp 70/30', picto: 'bom-bicomp-70-30' },
+      // `arriere: 'bicomp'` : vue arrière à 3 chaises (gauche, droite, bicomp tout à droite)
+      { id: 'bom_bicomp_5050', label: 'BOM bicomp 50/50', picto: 'bom-bicomp-50-50', arriere: 'bicomp' },
+      { id: 'bom_bicomp_7030', label: 'BOM bicomp 70/30', picto: 'bom-bicomp-70-30', arriere: 'bicomp' },
       { id: 'bom_bl',   label: 'BOM préhension latérale', picto: 'bom-prehension-laterale' },
       { id: 'grue_19t', label: 'BOM grue 19 T', picto: 'bom-grue-19t', zones: true },
       { id: 'grue_26t', label: 'BOM grue 26 T', picto: 'bom-grue-26t', zones: true },
@@ -37,7 +38,9 @@
     // Vues détaillées (image + dimensions pour positionner les points en pixels de l'image).
     vues: {
       cabine:  { label: 'Cabine',  img: 'img/vues/cabine.jpg',  w: 1343, h: 820 },
-      arriere: { label: 'Arrière', img: 'img/vues/arriere.jpg', w: 782,  h: 878 },
+      // `chaises` : chaises du lève-conteneur. Variante choisie par le type de véhicule (type.arriere).
+      arriere: { label: 'Arrière', img: 'img/vues/arriere.jpg', w: 782,  h: 878, chaises: COTES,
+        variantes: { bicomp: { img: 'img/vues/arriere-bicomp.svg', w: 900, h: 640, chaises: ['Gauche', 'Droite', 'Bicomp'] } } },
       pieton:  { label: 'Kit piéton' } // pas d'image : équipements listés
     },
 
@@ -47,6 +50,8 @@
     //  pos      : [x, y] en pixels de la vue, ou { Gauche: [x, y], Droite: [x, y] } si parCote
     //  hors     : pas visible sur l'image => affiché dans la zone « Non visible sur l'image »
     //  parCote  : un point (et une ligne) par chaise ; cotes/coteObligatoire pilotent le champ « Chaise »
+    //  chaise   : les côtés suivent les chaises de la vue (2, ou 3 sur une bi-comp) ; cotesPlus : côtés ajoutés (« 4 roues »)
+    //  posVariantes : positions sur l'image d'une variante de vue (ex. bicomp)
     //  arbre    : arbre de diagnostic (arbres.js) ; picto : icône (module/img/pictos)
     equipements: [
       { id: 'tablette', code: 'TA', label: 'Tablette',                    vue: 'cabine', solutions: EMBARQUE, pos: [670, 205], arbre: 'tablette', picto: 'ordinateur-de-bord' },
@@ -54,22 +59,25 @@
       { id: 'k3', code: 'K3',       label: 'Calculateur K3',               vue: 'cabine', solutions: EMBARQUE, hors: true, arbre: 'k3', picto: 'solution-embarquee-gps' },
       { id: 'ant_cab', code: 'AN',  label: 'Antenne (cabine)',             vue: 'cabine', solutions: EMBARQUE, hors: true, arbre: 'antenne_cab' },
 
-      { id: 'ant_ar', code: 'AN',   label: 'Antenne (dent antenne)', vue: 'arriere', solutions: ['citiid'], parCote: true, cotes: COTES, coteObligatoire: true,
-        pos: { Gauche: [165, 563], Droite: [250, 588] }, arbre: 'lecteur', picto: 'antenne-basse-frequence' },
-      { id: 'decodeur', code: 'DE', label: 'Décodeur',               vue: 'arriere', solutions: ['citiid'], parCote: true, cotes: COTES, coteObligatoire: true,
-        pos: { Gauche: [205, 658], Droite: [300, 678] }, arbre: 'lecteur', picto: 'lecteur-rfid' },
-      { id: 'bbv', code: 'BB',      label: 'Boîte à boutons (BBV)',  vue: 'arriere', solutions: ['citiid'], parCote: true, cotes: COTES, coteObligatoire: true,
-        pos: { Gauche: [88, 352], Droite: [333, 385] }, arbre: 'bbv', picto: 'boite-a-boutons' },
-      { id: 'nbab', code: 'NB',     label: 'NBAB (boîtier arrière)', vue: 'arriere', solutions: ['citiid'], pos: [525, 530], arbre: 'nbab' },
-      { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, cotes: COTES, coteObligatoire: false, arbre: 'cable' },
+      { id: 'ant_ar', code: 'AN',   label: 'Antenne (dent antenne)', vue: 'arriere', solutions: ['citiid'], parCote: true, chaise: true, coteObligatoire: true,
+        pos: { Gauche: [165, 563], Droite: [250, 588] }, posVariantes: { bicomp: { Gauche: [215, 415], Droite: [405, 415], Bicomp: [695, 415] } },
+        arbre: 'lecteur', picto: 'antenne-basse-frequence' },
+      { id: 'decodeur', code: 'DE', label: 'Décodeur',               vue: 'arriere', solutions: ['citiid'], parCote: true, chaise: true, coteObligatoire: true,
+        pos: { Gauche: [205, 658], Droite: [300, 678] }, posVariantes: { bicomp: { Gauche: [150, 385], Droite: [340, 385], Bicomp: [630, 385] } },
+        arbre: 'lecteur', picto: 'lecteur-rfid' },
+      { id: 'bbv', code: 'BB',      label: 'Boîte à boutons (BBV)',  vue: 'arriere', solutions: ['citiid'], parCote: true, chaise: true, coteObligatoire: true,
+        pos: { Gauche: [88, 352], Droite: [333, 385] }, posVariantes: { bicomp: { Gauche: [85, 275], Droite: [545, 275], Bicomp: [820, 275] } },
+        arbre: 'bbv', picto: 'boite-a-boutons' },
+      { id: 'nbab', code: 'NB',     label: 'NBAB (boîtier arrière)', vue: 'arriere', solutions: ['citiid'], pos: [525, 530], posVariantes: { bicomp: [550, 471] }, arbre: 'nbab' },
+      { id: 'cable', code: 'CA',    label: 'Câble',                  vue: 'arriere', solutions: ['citiid'], hors: true, chaise: true, coteObligatoire: false, arbre: 'cable' },
       // Capteurs et stops du lève-conteneur (guide §4.3 et §6) : fournis par le carrossier, hors charge Simpliciti,
       // mais indispensables à l'identification. Pas de point sur l'image (emplacement variable selon la benne).
       { id: 'capt_bac', code: 'CB', label: 'Capteur de présence bac', vue: 'arriere', solutions: ['citiid'], parCote: true, hors: true,
-        cotes: ['Gauche', 'Droite', '4 roues'], coteObligatoire: true, arbre: 'capteur_bac', horsSimpliciti: true },
+        chaise: true, cotesPlus: ['4 roues'], coteObligatoire: true, arbre: 'capteur_bac', horsSimpliciti: true },
       { id: 'capt_ph', code: 'PH',  label: 'Capteur de point haut',   vue: 'arriere', solutions: ['citiid'], parCote: true, hors: true,
-        cotes: COTES, coteObligatoire: true, arbre: 'capteur_ph', horsSimpliciti: true },
+        chaise: true, coteObligatoire: true, arbre: 'capteur_ph', horsSimpliciti: true },
       { id: 'stop_lc', code: 'ST',  label: 'Stops bac (lève-conteneur)', vue: 'arriere', solutions: ['citiid'], hors: true,
-        cotes: ['Gauche', 'Droite', '4 roues'], coteObligatoire: false, arbre: 'stopbac' },
+        chaise: true, cotesPlus: ['4 roues'], coteObligatoire: false, arbre: 'stopbac' },
 
       // Kit piéton : un seul équipement (smartphone lecteur de puces), présent dès que le véhicule a la solution
       { id: 'kp_kit', code: 'KP', label: 'Kit piéton', vue: 'pieton', solutions: ['kitpieton'], arbre: 'kitpieton', picto: 'lecteur-rfid' }

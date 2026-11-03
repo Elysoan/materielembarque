@@ -78,7 +78,7 @@ L'historique est conservé ; un import ultérieur remplace le parc complet.
 | Zone | Équipements | Solutions |
 |---|---|---|
 | Cabine | Antenne, calculateur K3, support de charge, tablette | toutes (CITIPAP, CITI'ID, CITI'Mission, CITIPAV) |
-| Arrière | Antenne (dent), décodeur, boîte à boutons, NBAB, câble | CITI'ID (les antennes / décodeurs / boîtes sont gérés par **chaise** gauche / droite) |
+| Arrière | Antenne (dent), décodeur, boîte à boutons, NBAB, câble | CITI'ID (antennes / décodeurs / boîtes gérés par **chaise** : gauche / droite, plus **bicomp** tout à droite sur les BOM bi-compartimentées, avec un schéma arrière dédié à 3 chaises) |
 | Arrière (lève-conteneur) | Capteurs de présence bac (gauche, droite, 4 roues), capteurs de point haut (gauche, droite), stops bac | CITI'ID. **Hors charge Simpliciti** (carrossier / atelier) : le destinataire du mail devient modifiable |
 | Kit piéton | Le kit (un seul équipement). Pannes types : absence du listing des contrats ou tournées, problème de charge, ne lit pas les puces | Kit piéton : solution seule ou **complément** d'une autre solution |
 

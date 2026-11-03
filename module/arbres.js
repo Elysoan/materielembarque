@@ -21,7 +21,7 @@
         ] },
         q1: { q: 'La BBV concernée s\'allume-t-elle au démarrage du système ?', options: [
           { r: 'Oui, elle s\'allume',
-            fin: { cause: 'BBV alimentée mais non reconnue : probable erreur de paramétrage / d\'adressage (gauche, droite, centre).', action: 'Vérifier le paramétrage de la BBV (procédure d\'adressage, document dédié Simpliciti).', gravite: 2 } },
+            fin: { cause: 'BBV alimentée mais non reconnue : probable erreur de paramétrage / d\'adressage (gauche, droite, centre).', action: 'Vérifier le paramétrage de la BBV (procédure d\'adressage, document dédié Simpliciti). Sur une bi-comp : chaise gauche = « gauche », chaise droite = « centre », chaise bicomp = « droite ».', gravite: 2 } },
           { r: 'Non, elle ne s\'allume pas', suite: 'q1b' }
         ] },
         q1b: { q: 'La brancher avec un câble volant neuf (en gardant le Y en sortie du NBAB), puis redémarrer le NBAB. S\'allume-t-elle et apparaît-elle en checklist ?', options: [

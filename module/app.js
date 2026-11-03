@@ -75,7 +75,7 @@
 
     /* ---------- Vue détaillée (image + points cliquables) ---------- */
     function vueHtml(v, vue) {
-      const cfg = store.vues[vue], lignes = store.lignes(v, vue);
+      const cfg = store.vueDe(v, vue), lignes = store.lignes(v, vue);
       if (!lignes.length) {
         return '<p class="me-empty">Aucun équipement « ' + cfg.label.toLowerCase() + ' » pour ce véhicule (' + esc(store.solutionsOf(v).map(s => (store.solution(s) || { label: s }).label).join(' + ')) + '). <a href="#" data-action="veh-modifier">Modifier le véhicule</a></p>';
       }
@@ -83,14 +83,16 @@
       const name = l => l.eq.label + (l.cote ? ' - ' + l.cote : '');
       const sev = l => store.graviteMax(v.id, l.eq.id, l.cote);
 
-      const spots = !cfg.img ? '' : lignes.filter(l => !l.eq.hors).map(l => {
-        const p = l.cote ? l.eq.pos[l.cote] : l.eq.pos, n = sev(l);
+      // pas de position connue sur cette image (ex. nouvel équipement sur une variante) : listé sous l'image
+      const placee = l => !l.eq.hors && !!store.posDe(v, l.eq, l.cote);
+      const spots = !cfg.img ? '' : lignes.filter(placee).map(l => {
+        const p = store.posDe(v, l.eq, l.cote), n = sev(l);
         return '<button class="me-hot me-s' + n + '" style="left:' + (p[0] / cfg.w * 100).toFixed(2) + '%;top:' + (p[1] / cfg.h * 100).toFixed(2) + '%" ' + attrs(l) +
           ' title="' + esc(name(l) + (n ? ' - défaut gravité ' + n : ' - RAS')) + '" aria-label="' + esc(name(l) + (n ? ', défaut gravité ' + n : ', RAS')) + '">' +
           '<span class="me-pulse"></span><b>' + l.eq.code + (l.cote ? '<small>' + l.cote[0] + '</small>' : '') + '</b>' + (n ? '<i>' + n + '</i>' : '') + '</button>';
       }).join('');
 
-      const hors = lignes.filter(l => l.eq.hors || !cfg.img);
+      const hors = lignes.filter(l => !placee(l) || !cfg.img);
       const tray = hors.length ? '<div class="me-tray"><span>' + (cfg.img ? 'Non visibles sur l\'image :' : 'Équipements :') + '</span>' + hors.map(l =>
         '<button class="me-chip me-s' + sev(l) + '" ' + attrs(l) + '>' + esc(name(l)) + (sev(l) ? ' · ' + sev(l) : '') + '</button>').join('') + '</div>' : '';
 
@@ -479,8 +481,9 @@
       const prec = store.recidives({ vehiculeId: v.id, equipId, cote }, new Date().toISOString());
       const recid = prec.length + 1 >= D.recidive.seuil && prec.length ? '<div class="me-warn me-rec"><b>↻ Panne récurrente</b> : ' + prec.length + ' signalement' + (prec.length > 1 ? 's' : '') +
         ' sur cet équipement' + (cote ? ' (' + esc(cote) + ')' : '') + ' en ' + D.recidive.jours + ' jours (' + refs(prec) + '). Le mail le signalera et demandera un remplacement ou une expertise.</div>' : '';
-      const chaise = e.cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
-        '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + e.cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
+      const cotes = store.cotesDe(v, e);
+      const chaise = cotes ? '<label>Chaise concernée' + (e.coteObligatoire ? '' : ' (facultatif)') + '<select name="cote"' + (e.coteObligatoire ? ' required' : '') + '>' +
+        '<option value="">' + (e.coteObligatoire ? 'Choisir…' : 'Non précisée') + '</option>' + cotes.map(c => '<option' + (c === cote ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' : '';
       openDlg(closeBtn + '<form class="me-form" data-form="declare" data-equip="' + equipId + '"><h3>' + (e.picto ? '<img class="me-ico-h" src="' + picto(e.picto) + '" alt="">' : '') + esc(e.label) + '</h3>' +
         '<p class="me-sub">' + esc(v.immat) + '</p>' + (e.arbre ? etapes(1) : '') + recid + existing + chaise +
         (e.arbre ? '<section class="me-diag" data-diag>' + diagBlock() + '</section>' : '') +
@@ -675,7 +678,7 @@
 
     el.addEventListener('click', ev => {
       if (ev.shiftKey && ev.target.matches('.me-vue img')) { // aide au calage des points : Maj + clic sur l'image
-        const r = ev.target.getBoundingClientRect(), cfg = store.vues[state.vue];
+        const r = ev.target.getBoundingClientRect(), cfg = store.vueDe(store.vehicule(state.vehicleId), state.vue);
         toast('pos: [' + Math.round((ev.clientX - r.left) / r.width * cfg.w) + ', ' + Math.round((ev.clientY - r.top) / r.height * cfg.h) + ']');
         return;
       }

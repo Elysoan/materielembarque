@@ -84,11 +84,27 @@
         data.parc = Object.assign({ fichier: '', importeLe: null }, data.parc || {}, { vehicules: api.vehicules.filter(x => x.id !== id), modifieLe: now() });
         persist();
       },
+      /** Configuration d'une vue pour ce véhicule (variante selon le type : ex. arrière bi-comp à 3 chaises). */
+      vueDe(v, vue) {
+        const cfg = vues[vue] || {}, t = api.type(v && v.type) || {}, k = t[vue];
+        return k && cfg.variantes && cfg.variantes[k] ? Object.assign({}, cfg, cfg.variantes[k], { variante: k }) : cfg;
+      },
+      /** Chaises / côtés possibles d'un équipement sur ce véhicule. */
+      cotesDe(v, e) {
+        if (!e.chaise) return e.cotes || null;
+        return (api.vueDe(v, e.vue).chaises || ['Gauche', 'Droite']).concat(e.cotesPlus || []);
+      },
+      /** Position [x, y] d'un équipement (et de sa chaise) sur l'image de la vue de ce véhicule. */
+      posDe(v, e, cote) {
+        const k = api.vueDe(v, e.vue).variante, p = (k && e.posVariantes && e.posVariantes[k]) || (k ? null : e.pos);
+        if (!p) return null;
+        return cote ? p[cote] || null : p;
+      },
       /** Lignes (équipement + chaise éventuelle) d'une vue : un équipement parCote donne une ligne par chaise. */
       lignes(v, vue) {
         const out = [];
         api.equipsOf(v).filter(e => e.vue === vue).forEach(e => {
-          if (e.parCote) e.cotes.forEach(c => out.push({ eq: e, cote: c })); else out.push({ eq: e, cote: null });
+          if (e.parCote) api.cotesDe(v, e).forEach(c => out.push({ eq: e, cote: c })); else out.push({ eq: e, cote: null });
         });
         return out;
       },

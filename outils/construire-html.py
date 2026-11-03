@@ -63,6 +63,9 @@ DEMO = r"""
   // BOM 120 (bicomp CITI'ID) : NBAB qui redémarre en boucle -> critique
   cree({ j: 0, mail: 1, qui: 'K. Martin (chef d\'équipe)', f: { vehiculeId: 'v3', equipId: 'nbab', gravite: 4,
     symptomes: 'Le NBAB redémarre en boucle ; aucune identification possible. Véhicule bloqué au dépôt pour la tournée bicomp.', diagnostic: diag('nbab', [0, 0, 1]) } });
+  // BOM 120 (bicomp) : chaise bicomp (tout à droite) sans lecture
+  cree({ j: 2, mail: 1, ticket: 'CS-24835', qui: 'K. Martin (chef d\'équipe)', f: { vehiculeId: 'v3', equipId: 'ant_ar', cote: 'Bicomp', gravite: 3,
+    symptomes: 'Chaise bicomp : aucune puce lue, les chaises gauche et droite lisent normalement.', diagnostic: diag('lecteur', [2, 0, 0]) } });
   // BOM 310 (CITIPAP) : K3 sans communication
   cree({ j: 6, mail: 1, ticket: 'CS-24790', qui: 'L. Moreau (exploitation)', f: { vehiculeId: 'v5', equipId: 'k3', gravite: 3,
     symptomes: 'Plus de remontée de position dans GeoRed depuis lundi. Voyant GPS vert clignotant, voyant communication rouge fixe.', diagnostic: diag('k3', [4, 0]) } });
