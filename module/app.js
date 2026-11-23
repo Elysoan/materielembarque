@@ -573,7 +573,7 @@
         '<p class="me-hint" data-note>' + (emlOk ? '' : 'Si Outlook ne s\'ouvre pas, copiez le message et collez-le dans un nouveau mail.') + '</p>' +
         '<div class="me-actions"><button type="button" class="me-btn me-vert" data-action="outlook">Ouvrir dans Outlook</button>' +
         (emlOk ? '<button type="button" class="me-btn" data-action="eml">Télécharger le brouillon (.eml)</button>' : '') +
-        '<button type="button" class="me-btn" data-action="copy">Copier</button></div></form>');
+        '<button type="button" class="me-btn" data-action="copy">Copier</button><button type="button" class="me-btn" data-action="close">Fermer</button></div></form>');
     }
     const readMail = () => {
       const f = dlg.querySelector('[data-form="mail"]');
@@ -659,12 +659,17 @@
         const m = readMail(), r = ME.mail.mailto(m);
         marquer('Outlook');
         const a = document.createElement('a'); a.href = r.url; a.click();
-        note(r.truncated ? 'Message trop long pour un lien Outlook : il a été tronqué. ' + (emlOk ? 'Utilisez le .eml' : 'Utilisez « Copier »') + ' pour le texte complet.' : 'Outlook doit s\'ouvrir avec le message. Sinon, ' + (emlOk ? 'utilisez le .eml.' : 'utilisez « Copier ».'));
+        // Texte tronqué : la fenêtre reste ouverte pour récupérer le message complet
+        if (r.truncated) { note('Message trop long pour un lien Outlook : il a été tronqué. ' + (emlOk ? 'Utilisez le .eml' : 'Utilisez « Copier »') + ' pour le texte complet.'); return; }
+        dlg.close();
+        toast(currentMail.id + ' enregistré, mail ouvert dans Outlook. S\'il ne s\'ouvre pas : Historique › le signalement › Revoir le mail.');
       },
       eml: () => {
         const m = readMail();
         marquer('.eml');
-        save(currentMail.id + '.eml', ME.mail.eml(m), 'message/rfc822').then(() => note('Ouvrez le fichier téléchargé : Outlook l\'ouvre en brouillon, prêt à envoyer.'));
+        download(currentMail.id + '.eml', ME.mail.eml(m), 'message/rfc822').then(() => {
+          dlg.close(); toast(currentMail.id + ' enregistré. Ouvrez le fichier téléchargé : Outlook l\'ouvre en brouillon, prêt à envoyer.');
+        }, e => note(e && e.code === 'declined' ? 'Enregistrement annulé.' : 'Enregistrement impossible ici : utilisez « Copier ».'));
       },
       copy: () => {
         const m = readMail();
